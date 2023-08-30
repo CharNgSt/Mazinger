@@ -1,0 +1,312 @@
+﻿@*@page "/pages/tools/sqlquery"
+@using Mazinger.DataAccess.DbConn;
+@using Mazinger.DataAccess.QueryFunction;
+@inject Func<string, ITransient, object> ResolveNamed
+@inject MazingerCookieStorage CookieStorage
+@inject IBlazorDownloadFileService BlazorDownloadFileService
+@implements IDisposable
+
+<MRow Class="py-1">
+    <MCol Sm=8 Md=9>
+        <MCard Class="line px-6 py-3 block-between">
+            <MTabs @bind-Value="tab" HideSlider Height=10 Color="sample-green" >
+                <MTab Value="@("query")" OnClick="()=>QueryTask()" >
+                    <MIcon Size=20 Color="@(tab=="query"?"primary":"fill")">mdi-magnify</MIcon>
+                    <span class="ml-1 text-h6 @(tab=="query"?"neutral--text":"fill--text")"> 查询</span>
+                </MTab>
+                <MTab Class="ml-2" Value="@("file")" OnClick="()=>QueryTask()">
+                    <MIcon Size=20 Color="@(tab=="file"?"primary":"fill")">mdi-microsoft-excel</MIcon>
+                    <span class="ml-1 text-h6 @(tab=="file"?"neutral--text":"fill--text")"> 导出文件</span>
+                </MTab>
+            </MTabs>
+            <MCardText>
+                <MDataTable Style="height: calc(100vh - 304px);" Headers="_headers" Items=@taskRow TItem="ExecDto" ItemsPerPage="PageSize" HideDefaultFooter Class="user ml-2 table-border-none" Loading="@PageLoading" LoadingText="数据加载中....">
+                    <HeaderColContent Context="header">
+                        <span class="text-subtitle">@header.Text</span>
+                    </HeaderColContent>
+                    <ItemColContent >
+                        @switch (context.Header.Value)
+                        {
+                            case "Icon":
+                                switch (context.Item.queryResult)
+                                {
+                                    default:
+                                    case "失败":
+                                        <MIcon Color="error">mdi-alert-circle</MIcon>
+                                        break;
+                                    case "完成":
+                                        <MIcon Color="success">mdi-check-circle</MIcon>
+                                        break;
+                                    case "查询中":
+                                        <MIcon>mdi-reload</MIcon>
+                                        break;
+                                }
+                                break;
+                            case (nameof(ExecDto.queryResultMemo)):
+                                <div style="max-height:100px;overflow:auto">@context.Item.queryCondition</div>
+                                break;
+                            case "Buttons":
+                                switch(context.Item.queryResult)
+                                {
+                                    default:
+                                        <span>@context.Item.queryResult</span>
+                                        break;
+                                    case "完成":
+                                        <MButton XSmall Color="primary" OnClick="@(()=>{ ShowResult(context.Item.guid,$"{context.Item.queryName}（{context.Item.queryDb}）", context.Item.queryCondition); })" style="float:right;">
+                                            <MIcon Left Dark>@(tab?.ToString() == "file" ? "mdi-download" : "mdi-table")</MIcon>
+                                                @(tab?.ToString() == "file" ? "下载" : "查看结果")
+                                        </MButton>
+                                        break;
+                                    case "失败":
+                                        <MButton XSmall OnClick="@(()=>{ ShowError(context.Item.queryName,context.Item.createdAt.ToString(),context.Item.queryCondition,context.Item.queryResultMemo); })" style="float:right;">
+                                            <MIcon Left Dark>mdi-alert-circle</MIcon>
+                                            查看错误
+                                        </MButton>
+                                        break;
+                                    case "查询中":
+                                        <MProgressLinear Indeterminate Color="primary"></MProgressLinear>
+                                        break;
+                                }
+                                break;
+                            case (nameof(ExecDto.updatedAt)):
+                                @switch (context.Item.queryResult)
+                                {
+                                    case "完成":
+                                    case "失败":
+                                        @context.Item.updatedAt
+                                        break;
+
+                                }
+                                break;
+                            case (nameof(ExecDto.queryName)):
+                                <span title="@context.Item.queryCondition" class="hover-pointer">@($"{context.Value}")<small>@($"（{context.Item.queryDb}）")</small></span>
+                                break;
+                            default:
+                                @context.Value
+                                break;
+                        }
+                    </ItemColContent>
+                </MDataTable>
+            </MCardText>
+            <MCardText>
+                <div class="d-flex" style="margin-top:30px">
+                    <div class="mr-auto pt-3 text-btn neutral-lighten-1--text">共 @CurrentCount 条数据</div>
+
+                    @if (PageCount > 0)
+                    {
+                        <MPagination Color="primary" Circle Length=@PageCount ValueChanged="QueryTask" Value="@PageIndex"></MPagination>
+                    }
+                </div>
+            </MCardText>
+        </MCard>
+    </MCol>
+    <MCol Sm=4 Md=3>
+        <MCard Class="line px-6 py-3 block-between">
+            <MCardText>
+                <MBanner SingleLine>
+                    <IconContent>
+                        <MIcon Color="@(selectQuryFunc == null ?"warning":"primary")" Size="26">@(selectQuryFunc == null ? "mdi-selection-ellipse-arrow-inside" : (tab.ToString() == "query" ? "mdi-magnify" : "mdi-microsoft-excel"))</MIcon>
+                    </IconContent>
+                        <ChildContent><strong class="text-h6">@(selectQuryFunc == null ? $"请选择一个{(tab?.ToString() == "query" ? "查询" : "导出")}" : selectQuryFunc.queryName)</strong></ChildContent>
+                    <ActionsContent>
+                        <MButton class="mx-2" XSmall Fab Dark Color="primary" style="float:right;" OnClick=GetQueryFunc>
+                            <MIcon>mdi-format-list-bulleted-square</MIcon>
+                        </MButton>
+                    </ActionsContent>
+                </MBanner>
+                @if(selectQuryFunc !=null)
+                {
+                    <Mazinger.ForDataStatistics.Pages.Content.QueryCondition hideDbSelect=true @bind-connSelect=connSelect @bind-queryFuncData=selectQuryFunc @bind-parameterList=parameterList @bind-queryDbCode=queryDbCode></Mazinger.ForDataStatistics.Pages.Content.QueryCondition>
+                    
+                    <p class="text-subtitle-2 text-center" style="margin-top:30px">
+                        <MButton MinWidth=80 Height=40 Color="primary" Class="ml-6 rounded-pill" OnClick=CreateTask> 创建任务 </MButton>
+                    </p>
+                }                
+
+            </MCardText>
+        </MCard>
+    </MCol>
+</MRow>
+
+<MNavigationDrawer Temporary Fixed Right @bind-Value=Visible Class="pa-6" Width=400>
+    <MTextField Class="rounded-2" AppendIcon="mdi-magnify" @bind-Value=queryFuncFilter Clearable Flat Dense Solo BackgroundColor="white" HideDetails="@("auto")" Placeholder="请输入查询条件..."></MTextField>
+    <MSimpleTable>
+        <tbody>
+            @foreach(var _item in  queryFuncRows.WhereIF(!string.IsNullOrEmpty(queryFuncFilter),_a=>_a.queryName.Contains(queryFuncFilter)).OrderBy(_a=>_a.queryName).ToList())
+            {
+                <tr class="hover-pointer" title="@_item.queryMemo" @onclick="()=>SelectFunc(_item)">
+                    <td class="text-left">
+                        @_item.queryName
+                    </td>
+                    <td class="text-right">
+                        <MIcon Size="28" Color="primary">mdi-chevron-right-circle</MIcon>
+                    </td>
+                </tr>            
+            }
+        </tbody>
+    </MSimpleTable>
+</MNavigationDrawer>
+
+<MNavigationDrawer Temporary Fixed Right @bind-Value=showVisible Class="pa-6" style="width: calc(100vw - 400px);">
+    <MBorder Tag="span" Color="primary" Style="border-radius:0;height:50%;margin: auto 0;"  >
+        <MCardTitle>@($"查询函数：{showName}")</MCardTitle>
+        <MCardSubtitle>@showMemo</MCardSubtitle>
+    </MBorder>
+    <Mazinger.ForDataStatistics.Pages.Content.QueryResultTable tableLoading=false @bind-tableRows=showRows />
+</MNavigationDrawer>
+
+<MNavigationDrawer Temporary Fixed Right @bind-Value=errorVisible Class="pa-6" style="width: 50vw;">
+    <MBorder Tag="span" Color="primary" Style="border-radius:0;margin: auto 0;">
+        <MCardTitle>@($"查询错误！")</MCardTitle>
+        <MCardSubtitle>
+            <p></p>
+            <p>@($"查询名：{showName}")</p>
+            <p>@($"查询时间：{showQueryTime}")</p>
+            <p>@showQueryCondition</p>
+            <p>错误信息：</p>
+        </MCardSubtitle>
+
+    </MBorder>
+    <MBorder Tag="span" Color="error" Style="border-radius:0;margin: auto 0;">
+        <MCard><MCardText>@showMemo</MCardText></MCard>
+    </MBorder>
+</MNavigationDrawer>
+
+<MySnackbars></MySnackbars>
+
+@code {
+    private IDataAccessInterface? Db;
+    private StringNumber? tab;
+    private bool Visible { set; get; }
+    private List<QueryFunctionEntity> queryFuncRows = new List<QueryFunctionEntity> { };
+    private QueryFunctionEntity? selectQuryFunc = null;
+    private string queryFuncFilter = "";
+    private List<ParameterDto> parameterList = new List<ParameterDto> { };
+    public List<DbConnDto> connSelect = new List<DbConnDto> { };
+    private string queryDbCode = "";
+    private ExecQueryDto _queryConditon = new ExecQueryDto { };
+
+    private readonly List<DataTableHeader<ExecDto>> _headers = new()
+    {
+        new() { Text = "", Value = "Icon",Width=40, Sortable =false },
+        new() { Text = "查询名", Value = nameof(ExecDto.queryName),Width=150 },
+        new() { Text = "创建时间", Value = nameof(ExecDto.createdAt),Width=160 },
+        new() { Text = "完成时间", Value = nameof(ExecDto.updatedAt),Width=160 },
+        new() { Text = "执行参数", Value = nameof(ExecDto.queryCondition) },
+        new() { Text = "操作", Value ="Buttons",Align = DataTableHeaderAlign.End, Sortable =false }
+    };
+    private List<ExecDto> taskRow = new List<ExecDto> { };
+    private int PageIndex { get; set; } = 1;
+    private int PageSize { get; set; } = 10;
+    private int PageCount => (int)Math.Ceiling(CurrentCount / (double)PageSize);
+    private int CurrentCount = 0;
+    private bool PageLoading = true;
+
+    private bool showVisible { set; get; }
+    private string showName { set; get; }
+    private string showQueryTime { set; get; }
+    private string showQueryCondition { set; get; }
+    private string showMemo { set; get; }    
+    private JArray showRows = null;
+
+    private bool errorVisible { set; get; }
+
+    protected override async void OnInitialized()
+    {
+        Db = ResolveNamed(nameof(DefaultDataAccess), default) as IDataAccessInterface;
+        connSelect = Db.BDA_GetSql().GetConnSelect();
+        await QueryTask(1);
+        base.OnInitialized();
+    }
+
+    /// <summary>
+    /// 验证登录状态
+    /// </summary>
+    private Timer checkQueryResultTimer;
+
+    /// <summary>
+    /// 页面加载
+    /// </summary>
+    /// <returns></returns>
+    protected override async Task OnInitializedAsync()
+    {
+        checkQueryResultTimer = new Timer(async state =>
+        {
+            if (taskRow.Where(_a => _a.queryResult == "查询中").Any())
+            {                
+                await QueryTask(PageIndex);
+            }
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task QueryTask(int _PageIndex = 1)
+    {
+        selectQuryFunc = null;
+        PageLoading = true;
+        PageIndex = _PageIndex;
+
+        var _res = Db.BDA_GetSql().GetTaskList(new ExecQueryDto { page = PageIndex, pageSize = PageSize, queyrExecType = (tab == null || tab?.ToString() == "query" ? "query" : "file") }, CookieStorage.LoginUserCode);
+        taskRow = _res.rows;
+        CurrentCount = _res.totalCount;
+        PageLoading = false;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CreateTask()
+    {
+        await QueryFunctionHelper.CheckPar(parameterList);
+        await Idb.CreateTask(selectQuryFunc.queryGuid, parameterList, CookieStorage.LoginUserCode);
+        MySnackbars.Enqueue(AlertTypes.Success, "创建完毕！");
+        await QueryTask(1);
+
+    }
+
+    private async Task GetQueryFunc()
+    {
+        queryFuncRows = Idb.GetQueryFuncList(null, null, CookieStorage.LoginUserCode, tab?.ToString());
+        Visible = true;
+    }
+
+    private async Task SelectFunc(QueryFunctionEntity _target)
+    {
+        selectQuryFunc = _target;
+        parameterList = Idb.GetParameters(selectQuryFunc.queryGuid).Select(_a => new ParameterDto { Name = _a.parameterName, Type = _a.parameterType, Value = "", DateValue = null }).ToList();
+        Visible = false;
+    }
+
+    private async Task ShowResult(string _guid, string _queryName, string _queryMemo)
+    {
+        if (tab?.ToString() == "file")
+        {
+            var contentBytes = Idb.GetFileBase64(_guid, "csv");
+            await BlazorDownloadFileService.DownloadFile($"{Guid.NewGuid().ToString()}.csv", contentBytes, "application/octet-stream");
+        }
+        else
+        {
+            showName = _queryName;
+            showMemo = _queryMemo;
+            byte[] jsonBytes = Convert.FromBase64String(Idb.GetFileBase64(_guid, "json"));
+            string json = System.Text.Encoding.UTF8.GetString(jsonBytes);
+            showRows = json.toJsonArray();
+            showVisible = true;
+        }
+    }
+
+    private async Task ShowError(string _queryName,string _queryTime,string _queryCondition, string _queryMemo)
+    {
+        showName = _queryName;
+        showQueryCondition = _queryCondition;
+        showQueryTime = _queryTime;
+        showMemo = _queryMemo;
+        errorVisible = true;
+    }
+
+    /// <summary>
+    /// 页面释放资源时，需在页首声明 @implements IDisposable
+    /// </summary>
+    public void Dispose()
+    {
+        checkQueryResultTimer.Dispose();
+    }
+}*@

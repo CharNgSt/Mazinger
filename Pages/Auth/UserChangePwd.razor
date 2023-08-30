@@ -1,0 +1,170 @@
+﻿@using Mazinger.DataAccess.User
+@inject ISqlSugarClient Db
+
+<MDialog Value=changePwdVisable Persistent MaxWidth=600>
+    <ChildContent>
+        <MCard>
+            <MCardTitle>
+                <span class="text-h5">修改密码</span>
+            </MCardTitle>
+            <MCardText>
+                <MContainer Fluid>
+                    <MRow>
+                        <MCol Cols="12" style="height:80px">
+                            <MTextField Label="原密码" @bind-Value=_model.p1Val Rules=RequiredRules TValue="string" Type="@(_model.p1Show ? "text" : "password")" AppendIcon="@(_model.p1Show ? "mdi-eye" : "mdi-eye-off")" OnAppendClick="()=>_model.p1Show = !_model.p1Show" HideDetails="@("auto")" />
+                        </MCol>
+                        <MCol Cols="12" style="height:80px">
+                            <MTextField Label="新密码" @bind-Value=_model.p2Val Rules=PwdRules TValue="string" Type="@(_model.p2Show ? "text" : "password")" AppendIcon="@(_model.p2Show ? "mdi-eye" : "mdi-eye-off")" OnAppendClick="()=>_model.p2Show = !_model.p2Show" HideDetails="@("auto")" />
+                        </MCol>
+                        <MCol Cols="12" style="height:80px">
+                            <MTextField Label="确认密码" @bind-Value=_model.p3Val Rules=PwdRules TValue="string" Type="@(_model.p3Show ? "text" : "password")" AppendIcon="@(_model.p3Show ? "mdi-eye" : "mdi-eye-off")" OnAppendClick="()=>_model.p3Show = !_model.p3Show" HideDetails="@("auto")" />
+                        </MCol>
+                    </MRow>
+                </MContainer>
+            </MCardText>
+            <MCardActions>
+                <MSpacer></MSpacer>
+                @if (canCancel)
+                {
+                    <MButton Color="blue darken-1" Text Disabled="_model.loading" OnClick="() => UpdateVisible(false)">取消</MButton>
+                }
+                <MButton Color="blue darken-1" Text Disabled="_model.loading" OnClick=HandleOnValidSubmit>保存</MButton>
+            </MCardActions>
+        </MCard>
+    </ChildContent>
+</MDialog>
+<MySnackbars></MySnackbars>
+
+@code {
+    /// <summary>
+    /// 当前登录账号
+    /// </summary>
+    [Parameter]
+    public string loginUserCode { get; set; }
+    /// <summary>
+    /// 数据库租户代码
+    /// </summary>
+    [Parameter]
+    public string tenantCode { get; set; }
+    /// <summary>
+    /// 允许取消修改
+    /// </summary>
+    [Parameter]
+    public bool canCancel { get; set; } = false;
+    /// <summary>
+    /// 隐藏或显示
+    /// </summary>
+    [Parameter]
+    public bool changePwdVisable { get; set; }
+    /// <summary>
+    /// 修改变量委托
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> changePwdVisableChanged { get; set; }
+    /// <summary>
+    /// 更新隐藏或显示
+    /// </summary>
+    /// <param name="visible"></param>
+    /// <returns></returns>
+    private async Task UpdateVisible(bool visible)
+    {
+        if (changePwdVisableChanged.HasDelegate) await changePwdVisableChanged.InvokeAsync(visible);
+        else changePwdVisable = visible;
+    }
+
+    class PwdChangeDto
+    {
+        public bool loading { set; get; }
+        /// <summary>
+        /// 原密码
+        /// </summary>
+        public string p1Val { set; get; }
+        /// <summary>
+        /// 原密码显示原文
+        /// </summary>
+        public bool p1Show { set; get; }
+        /// <summary>
+        /// 新密码
+        /// </summary>
+        public string p2Val { set; get; }
+        /// <summary>
+        /// 新密码显示原文
+        /// </summary>
+        public bool p2Show { set; get; }
+        /// <summary>
+        /// 确认密码
+        /// </summary>
+        public string p3Val { set; get; }
+        /// <summary>
+        /// 确认密码显示原文
+        /// </summary>
+        public bool p3Show { set; get; }
+
+    }
+    private PwdChangeDto _model = new();
+
+    private string _checkPwdLevel = "System:Setting:PwdRule".GetConfigVal();
+    private Func<string, StringBoolean> RequiredRule => val => CheckPwd(val, true, out string _pwdMsg) ? true : _pwdMsg;
+    private Func<string, StringBoolean> PwdRule => val => CheckPwd(val, false, out string _pwdMsg) ? true : _pwdMsg;
+    private Func<string, StringBoolean> PwdSameRule => val => string.Compare(_model.p2Val, _model.p3Val) == 0 ? true : "确认密码与新密码不一致";
+    private IEnumerable<Func<string, StringBoolean>> PwdRules => new List<Func<string, StringBoolean>>() { PwdRule, PwdSameRule };
+    private IEnumerable<Func<string, StringBoolean>> RequiredRules => new List<Func<string, StringBoolean>>() { RequiredRule };
+    private bool CheckPwd(string _val, bool _justCheckEmpty, out string _pwdMsg)
+    {
+
+        _pwdMsg = "";
+        var _res = false;
+        if (!string.IsNullOrEmpty(_val))
+        {
+            if (_justCheckEmpty)
+                _res = true;
+            else
+            {
+                switch (_checkPwdLevel)
+                {
+                    default:
+                    case "level1":
+                        _res = _val.CheckPwd_IsLevel1();
+                        if (!_res) _pwdMsg = StaticPwdRule.Level2PwdIllustrate;
+                        break;
+                    case "level2":
+                        _res = _val.CheckPwd_IsLevel2();
+                        if (!_res) _pwdMsg = StaticPwdRule.Level2PwdIllustrate;
+                        break;
+                    case "level3":
+                        _res = _val.CheckPwd_IsLevel3();
+                        if (!_res) _pwdMsg = StaticPwdRule.Level3PwdIllustrate;
+                        break;
+                }
+            }
+        }
+        else _pwdMsg = "值不能为空！";
+
+        return _res;
+    }
+
+    private async Task HandleOnValidSubmit()
+    {
+        if (
+            CheckPwd(_model.p1Val, true, out string _n1) &&
+            CheckPwd(_model.p2Val, false, out string _n2) &&
+            CheckPwd(_model.p3Val, false, out string _n3) &&
+            string.Compare(_model.p2Val, _model.p3Val) == 0
+        )
+        {
+            _model.loading = true;
+
+            try
+            {
+                await Db.GetDb(tenantCode).User_UpdatePwd(loginUserCode, MD5Encryption.Encrypt(_model.p2Val, true, false), MD5Encryption.Encrypt(_model.p1Val, true, false));
+                MySnackbars.Enqueue(AlertTypes.Success, $"修改密码完毕");
+            }
+            catch { }
+
+            _model.loading = false;
+
+        }
+
+    }
+
+}

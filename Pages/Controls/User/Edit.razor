@@ -1,0 +1,296 @@
+﻿@using Mazinger.DataAccess.Permission;
+@using Mazinger.DataAccess.QueryFunction;
+@inject Func<string, ITransient, object> ResolveNamed
+
+<MNavigationDrawer Temporary Stateless Fixed Right @bind-Value=PageShow Class="pa-6" style="width:60vw">
+    <MCard Class="line px-1 py-1 block-between">
+        <MTabs @bind-Value="tab" HideSlider Height=10 Color="sample-green">
+            <MTab Value="@("用户信息")">
+                <MIcon Size=16 Color="@(tab=="用户信息"?"primary":"fill")">mdi-account-details</MIcon>
+                <span class="ml-1 text-h6 @(tab=="用户信息"?"neutral--text":"fill--text")"> @(TableItem.InputIsNew ? "新建" : $"修改")@TableItem.InputPageName</span>
+            </MTab>
+            <MTab Value="@("权限")">
+                <MIcon Size=16 Color="@(tab=="权限"?"primary":"fill")">mdi-account-cog</MIcon>
+                <span class="ml-1 text-h6 @(tab=="权限"?"neutral--text":"fill--text")"> 权限</span>
+            </MTab>
+            <MTab Class="ml-2" Value="@("查询函数")">
+                <MIcon Size=16 Color="@(tab=="查询函数"?"primary":"fill")">mdi-database-search</MIcon>
+                <span class="ml-1 text-h6 @(tab=="查询函数"?"neutral--text":"fill--text")"> 查询函数</span>
+            </MTab>
+        </MTabs>
+        <MCardText>
+            <MTabsItems @bind-Value="tab" Class="mt-1">
+                <MTabItem Value="@("用户信息")">
+                    @foreach (var _qItem in TableItem.InputItems.Where(_a => _a.Flag).ToList())
+                    {
+                        <MRow Class="mt-1">
+                            <MCol>
+                                <MTextField Type="@(nameof(_qItem.InputType).ToLower())" @bind-Value="_qItem.InputVal" Label="@_qItem.LabelTxt" HideDetails="@("auto")" Outlined Clearable Placeholder="@(string.IsNullOrEmpty(_qItem.HolderTxt)?"":$"{_qItem.HolderTxt}...")" Disabled=@(!TableItem.InputIsNew) />
+                            </MCol>
+                        </MRow>
+                    }
+
+                    @foreach (var _qItem in TableItem.InputItems.Where(_a => _a.InputName == Db.BDA_GetColumnName<UserEntity>(u => u.userName)))
+                    {
+                        <MRow Class="mt-1">
+                            <MCol>
+                                <TableInput qItem=_qItem></TableInput>
+                            </MCol>
+                        </MRow>
+                    }
+
+                    @foreach (var _qItem in TableItem.InputItems.Where(_a => _a.InputName == Db.BDA_GetColumnName<UserEntity>(u => u.userPwd)))
+                    {
+                        <MRow Class="mt-1">
+                            <MCol>
+                                <MTextField 
+                                    @bind-Value="_qItem.InputVal"
+                                    Type="@(showPwd ? "text" : "password")" AppendIcon="@(showPwd ? "mdi-eye" : "mdi-eye-off")" OnAppendClick="()=>showPwd = !showPwd"
+                                    Label="@_qItem.LabelTxt" 
+                                    HideDetails="@("auto")" 
+                                    Outlined Clearable Placeholder="请输入密码，修改用户信息时不输入密码视为不修改..." 
+                                />
+                            </MCol>
+                        </MRow>
+                    }
+
+                    <div style="height: calc(100vh - 464px);overflow:auto;overflow-x:hidden;">
+                        @foreach (var _qItem in TableItem.InputItems.Where(_a => !_a.Flag && !string.IsNullOrEmpty(_a.LabelTxt) && _a.InputName != Db.BDA_GetColumnName<UserEntity>(u => u.userPwd) && _a.InputName != Db.BDA_GetColumnName<UserEntity>(u => u.userName)).ToList())
+                        {
+                            <MRow Class="mt-1">
+                                <MCol>
+                                    <TableInput qItem=_qItem></TableInput>
+                                </MCol>
+                            </MRow>
+                        }
+                    </div>
+                    <p class="text-subtitle-2 text-center">
+                        <MButton Loading="loading" Disabled="loading" Class="mt-11 rounded-4 text-btn white--text" Height=40 Width=80 Color="success" OnClick=SaveUser>
+                            <MIcon Left Dark>mdi-account-filter</MIcon>
+                            保存
+                        </MButton>
+
+
+                        <MButton Width=80 Height=40 Outlined Class="mt-11 rounded-4 text-btn" OnClick="async ()=>await UpdatePageShow(false)">
+                            <MIcon Left Dark>
+                                mdi-keyboard-return
+                            </MIcon>
+                            取消
+                        </MButton>
+                    </p>
+                </MTabItem>
+
+                <MTabItem Value="@("权限")">
+                    @if (TableItem.InputIsNew)
+                    {
+                        <h6>保存用户信息后才可编辑权限</h6>                        
+                    }
+                    else {
+                        <MSimpleTable style="height: calc(100vh - 264px);overflow:auto;overflow-x:hidden;">
+                            <thead>
+                                <tr>
+                                    <th class="text-left" style="width:80px">名称</th>
+                                    <th class="text-left">
+                                        <MTextField Style="width:200px" Class="rounded-2" AppendIcon="mdi-magnify" @bind-Value=queryPermissionFilter Clearable Flat Dense Solo BackgroundColor="white" HideDetails="@("auto")" Placeholder="请输入查询条件..."></MTextField>
+                                    </th>
+                                    <th class="text-left">允许使用</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var _permisssion in userPermissionList.WhereIF(!string.IsNullOrEmpty(queryPermissionFilter), p => p.pName.Contains(queryPermissionFilter)).OrderBy(p => p.pName).ToList())
+                                {
+                                    <tr @key="_permisssion.pName">
+                                        <td colspan="2">@_permisssion.pName</td>
+                                        <td class="text-right">
+                                            <MCheckbox Class="mt-0" Label="@(_permisssion.forDuty ? "职务权限" : "")" Color="primary" @bind-Value=@_permisssion.selected Disabled=@_permisssion.forDuty></MCheckbox>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MSimpleTable>
+                        <p class="text-subtitle-2 text-center">
+                            <MButton Loading="loading" Disabled="loading" Class="mt-11 rounded-4 text-btn white--text" Height=46 Width=120 Color="success" OnClick="SaveUserPermission">
+                                <MIcon Left Dark>mdi-account-filter</MIcon>
+                                保存权限
+                            </MButton>
+                            <MButton Width=80 Height=40 Outlined Class="mt-11 rounded-4 text-btn" OnClick="async ()=>await UpdatePageShow(false)">
+                                <MIcon Left Dark>
+                                    mdi-keyboard-return
+                                </MIcon>
+                                取消
+                            </MButton>
+                        </p>
+                    }
+                </MTabItem>
+
+                <MTabItem Value="@("查询函数")">
+                    @if (TableItem.InputIsNew)
+                    {
+                        <h6>保存用户信息后才可授权查询</h6>                        
+                    }
+                    else {
+                        <MSimpleTable style="height: calc(100vh - 264px);overflow:auto;overflow-x:hidden;">
+                            <thead>
+                                <tr>
+                                    <th class="text-left">名称</th>
+                                    <th class="text-left">类型</th>
+                                    <th class="text-left">允许使用</th>
+                                    <th style="width:200px">
+                                        <MTextField Class="rounded-2" AppendIcon="mdi-magnify" @bind-Value=queryFuncFilter Clearable Flat Dense Solo BackgroundColor="white" HideDetails="@("auto")" Placeholder="请输入查询条件..."></MTextField>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var _queryFunc in userQueryFuncList.WhereIF(!string.IsNullOrEmpty(queryFuncFilter), p => p.qName.Contains(queryFuncFilter)).OrderBy(p => p.qName).ToList())
+                                {
+                                    <tr @key="_queryFunc.qGuid">
+                                        <td>@_queryFunc.qName</td>
+                                        <td>@_queryFunc.qType</td>
+                                        <td colspan="2" class="text-center">
+                                            @if (_queryFunc.allallow)
+                                            {
+                                                @("全员允许")
+                                            }
+                                            else
+                                            {
+                                                <MCheckbox Class="mt-0" Color="primary" @bind-Value=@_queryFunc.selected OnClick="()=>{ UpdateQuryFuncUse(_queryFunc);}"></MCheckbox>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MSimpleTable>
+                        <p class="text-subtitle-2 text-center">
+                            <MButton Loading="loading" Disabled="loading" Class="mt-11 rounded-4 text-btn white--text" Height=46 Width=120 Color="success" OnClick="SaveUserPermission">
+                                <MIcon Left Dark>mdi-account-filter</MIcon>
+                                保存配置
+                            </MButton>
+                            <MButton Width=80 Height=40 Outlined Class="mt-11 rounded-4 text-btn" OnClick="async ()=>await UpdatePageShow(false)">
+                                <MIcon Left Dark>
+                                    mdi-keyboard-return
+                                </MIcon>
+                                取消
+                            </MButton>
+                        </p>
+                    }
+                </MTabItem>
+            </MTabsItems>
+        </MCardText>
+    </MCard>
+       
+
+</MNavigationDrawer>
+
+@code {
+    private IDataAccessInterface? Db;
+
+    /// <summary>
+    /// 表单加载对象
+    /// </summary>
+    [Parameter]
+    public TableItemClass TableItem { get; set; }
+    /// <summary>
+    /// 表单对象更新
+    /// </summary>
+    [Parameter]
+    public EventCallback<TableItemClass> TableItemChanged { get; set; }
+    /// <summary>
+    /// 隐藏与显示
+    /// </summary>
+    [Parameter]
+    public bool PageShow { get; set; }
+    /// <summary>
+    /// 隐藏与显示更新
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> PageShowChanged { get; set; }
+    /// <summary>
+    /// 更新PageShow值函数，必须使用async Task更新
+    /// </summary>
+    /// <param name="visible"></param>
+    /// <returns></returns>
+    private async Task UpdatePageShow(bool visible)
+    {
+        if (PageShowChanged.HasDelegate) await PageShowChanged.InvokeAsync(visible);
+        else PageShow = visible;
+    }
+
+    class permissionSelect
+    {
+        public string pName { get; set; }
+
+        public bool selected { get; set; }
+
+        public bool forDuty { get; set; }
+    }
+    private List<permissionSelect> userPermissionList = new List<permissionSelect> { };
+
+    class queryFuncSelect
+    {
+        public string qGuid { get; set; }
+        public string qName { get; set; }
+        public string qType { get; set; }
+        public bool selected { get; set; }
+        public bool allallow { get; set; }
+    }
+    private List<queryFuncSelect> userQueryFuncList = new List<queryFuncSelect> { };
+
+    private bool showPwd = false;
+    private bool loading = false;
+    private StringNumber? tab;
+    private string queryPermissionFilter = "";
+    private string queryFuncFilter = "";
+
+
+    protected override async void OnInitialized()
+    {
+        Db = ResolveNamed(nameof(DefaultDataAccess), default) as IDataAccessInterface;
+    }
+
+    protected override void OnParametersSet()
+    {
+        var userCode = TableItem.InputItems.ToObj<UserEntity>().userCode;
+        var _userQueryFunc = new List<string> { };
+        if (!TableItem.InputIsNew)
+        {
+            TableItem.InputItems.Where(_a => _a.InputName == Db.BDA_GetColumnName<UserEntity>(u => u.userPwd)).FirstOrDefault().InputVal = "";
+            _userQueryFunc = Db.BDA_GetSql().QueryFunc_GetList(null, null, userCode, null).Select(_a => _a.queryGuid).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(userCode))
+        {
+            var _u_p = Db.BDA_GetSql().Permission_GetUserPermission(userCode);
+            userPermissionList = Db.BDA_GetSql().Permission_Get().ConvertAll(_a => new permissionSelect { pName = _a, selected = _u_p.Where(_u_a => _u_a.permissionName == _a).Any(), forDuty = _u_p.Where(_u_a => _u_a.permissionName == _a && _u_a.permissionType == "0").Any() });
+
+            var _allQueryFunc = Db.BDA_GetSql().QueryFunc_GetList(null, null, null, null);
+            userQueryFuncList = _allQueryFunc.Select(_a => new queryFuncSelect { qGuid = _a.queryGuid, qName = _a.queryName, qType = _a.queryType == "query" ? "查询" : "生成文件", allallow = _a.queryAllAllow, selected = _userQueryFunc.Contains(_a.queryGuid) }).ToList();
+        }
+    }
+
+    private async Task SaveUser()
+    {
+        TableItem.InputItems.Where(_a => !_a.Nullable && _a.InputName != Db.BDA_GetColumnName<UserEntity>(u => u.userPwd)).ForEach(_item => { if (string.IsNullOrEmpty(_item.InputVal)) throw new Exception($"{_item.LabelTxt}值不能为空！"); });
+
+        var _qItem = TableItem.InputItems.Where(_a => _a.InputName == Db.BDA_GetColumnName<UserEntity>(u => u.userPwd)).FirstOrDefault();
+        if (!string.IsNullOrEmpty(_qItem.InputVal)) _qItem.InputVal = _qItem.InputVal.MD5Encode();
+        await TableItem.SaveFunc.InvokeAsync();
+        MySnackbars.Enqueue(AlertTypes.Success, $"{(TableItem.InputIsNew ? "新增" : "修改")}{TableItem.InputPageName}信息成功！");
+        TableItem.InputIsNew = false;
+        _qItem.InputVal = "";
+        await TableItem.QueryFunc.InvokeAsync(1);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SaveUserPermission()
+    {
+        if (TableItem.InputIsNew) throw new Exception("请先保存用户信息！");
+        await Db.BDA_GetSql().Permission_SaveUserPermission(TableItem.InputItems.ToObj<UserEntity>().userCode, userPermissionList.Where(_a => _a.selected && !_a.forDuty).ToList().ConvertAll(_a => _a.pName));
+        MySnackbars.Enqueue(AlertTypes.Success, "保存用户权限完毕！");
+    }
+
+    private async Task UpdateQuryFuncUse(queryFuncSelect _targert)
+    {
+        await Db.BDA_GetSql().SaveQueryPriv(_targert.qGuid, TableItem.InputItems.ToObj<UserEntity>().userCode, _targert.selected);
+        MySnackbars.Enqueue(AlertTypes.Success, $"用户【{TableItem.InputItems.ToObj<UserEntity>().userName}】{(_targert.selected ? "可以" : "不能")}使用查询{_targert.qName}！");
+    }
+}

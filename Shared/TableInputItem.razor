@@ -1,0 +1,92 @@
+﻿
+<MNavigationDrawer Temporary Stateless Fixed Right @bind-Value=PageShow Class="pa-6" Width=@PageWidth>
+    <div class="block-between mb-6">
+        <span class="text-h6">@(TableItem.InputIsNew ? "新建" : $"修改")@TableItem.InputPageName</span>
+    </div>
+
+    @foreach (var _qItem in TableItem.InputItems.Where(_a => _a.Flag).ToList())
+    {
+        <MRow Class="mt-1">
+            <MCol>
+                <MTextField Type="@(nameof(_qItem.InputType).ToLower())" @bind-Value="_qItem.InputVal" Label="@_qItem.LabelTxt" HideDetails="@("auto")" Outlined Clearable Placeholder="@($"{_qItem.HolderTxt}...")" Disabled=@(!TableItem.InputIsNew) />
+            </MCol>
+        </MRow>
+    }
+    
+    @foreach (var _qItem in TableItem.InputItems.Where(_a => !_a.Flag).ToList())
+    {
+        <MRow Class="mt-1">
+            <MCol>
+                <TableInput qItem=_qItem></TableInput>
+            </MCol>
+        </MRow>
+    }
+
+    <div style="bottom:48px;right:24px;position:absolute">
+        <MButton MinWidth=80 Height=40 Outlined Class="text-btn rounded-pill" OnClick="async ()=>await UpdatePageShow(false)"> 取消 </MButton>
+        <MButton MinWidth=80 Height=40 Color="primary" Class="ml-6 rounded-pill" OnClick=DoSave> 保存 </MButton>
+    </div>
+
+</MNavigationDrawer>
+
+@code {
+    /// <summary>
+    /// 新增宽度，默认400
+    /// </summary>
+    [Parameter]
+    public StringNumber PageWidth { get; set; }
+    /// <summary>
+    /// 表单加载对象
+    /// </summary>
+    [Parameter]
+    public TableItemClass TableItem { get; set; }
+    /// <summary>
+    /// 表单对象更新
+    /// </summary>
+    [Parameter]
+    public EventCallback<TableItemClass> TableItemChanged { get; set; }
+    /// <summary>
+    /// 隐藏与显示
+    /// </summary>
+    [Parameter]
+    public bool PageShow { get; set; }
+    /// <summary>
+    /// 表单对象更新
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> PageShowChanged { get; set; }
+    /// <summary>
+    /// 更新PageShow值函数，必须使用async Task更新
+    /// </summary>
+    /// <param name="visible"></param>
+    /// <returns></returns>
+    private async Task UpdatePageShow(bool visible)
+    {
+        if (PageShowChanged.HasDelegate) await PageShowChanged.InvokeAsync(visible);
+        else PageShow = visible;
+    }
+    /// <summary>
+    /// 首次实例化页面加载函数
+    /// </summary>
+    protected override async void OnInitialized()
+    {
+        if (PageWidth == null) PageWidth = "400";
+        base.OnInitialized();
+    }
+    /// <summary>
+    /// 保存函数
+    /// </summary>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    private async Task DoSave()
+    {
+        TableItem.InputItems.Where(_a => !_a.Nullable).ForEach(_item => { if (string.IsNullOrEmpty(_item.InputVal)) throw new Exception($"{_item.LabelTxt}值不能为空！"); });
+        await TableItem.SaveFunc.InvokeAsync();
+        await UpdatePageShow(false);
+        MySnackbars.Enqueue(AlertTypes.Success, $"{(TableItem.InputIsNew ? "新增" : "修改")}{TableItem.InputPageName}信息成功！");
+        await TableItem.QueryFunc.InvokeAsync(1);
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+}

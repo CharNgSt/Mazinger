@@ -1,0 +1,95 @@
+﻿@page "/pages/controls/dbs"
+@using Mazinger.DataAccess.DbConn;
+@inject Func<string, ITransient, object> ResolveNamed
+
+<MCard>
+    <MCardText>
+        <MSimpleTable style="height: calc(100vh - 120px);overflow:auto;overflow-x:hidden;">
+            <thead>
+                <tr>
+                    <th class="text-left" style="width:120px">代码</th>
+                    <th class="text-left" style="width:120px">名称</th>
+                    <th class="text-left" style="width:120px">类型</th>
+                    <th class="text-left">连接串</th>
+                    <th class="text-left" style="width:300px">
+                        操作                                               
+                        <MButton XSmall Color="primary" OnClick="@(()=>{ ModiItem(new DbConnEntity{}); })" style="float:right;">
+                            <MIcon Left Dark>mdi-database-plus</MIcon>
+                            新增
+                        </MButton>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var _conn in connList)
+                {
+                    <tr @key="_conn.dbCode">
+                        <td>@_conn.dbCode</td>
+                        <td>@_conn.dbName</td>
+                        <td>@_conn.dbType</td>
+                        <td>@_conn.dbConn</td>
+                        <td>
+                            <MButton XSmall Color="primary" OnClick="()=> ModiItem(_conn)">编辑</MButton>
+                            <MButton XSmall Color="error" OnClick="()=> AskDelectItem(_conn)">删除</MButton>
+                        </td>
+                    </tr>
+                }
+        </tbody>
+    </MSimpleTable>
+    </MCardText>
+</MCard>
+
+<Edit @bind-Visible=_visible selectCode=@selectCode ConnData=@selectConn confirmFunc=@(()=>QueryList())></Edit>
+<MyDialog @bind-Visible=_dialogShow content="@($"要删除链接【{selectConn.dbName}】吗？")" iconClass="mdi-account-question" cancelBtnVisable=true confirmFunc=@(()=>DelectItem(selectConn.dbCode))></MyDialog>
+
+@code {
+    private IDataAccessInterface? Db;
+    private bool _visible;
+    private bool _dialogShow;
+    class ConnModel
+    {
+        public string dbCode { get; set; }
+        public string dbName { get; set; }
+        public string dbType { get; set; }
+        public string dbConn { get; set; }
+        public string dbCreateUser { get; set; }
+        public DateTime dbCreateDay { get; set; }
+        public bool isRunning { get; set; }
+    }
+    private List<DbConnEntity> connList = new List<DbConnEntity> { };
+    private string selectCode = "";
+    private DbConnEntity selectConn = new DbConnEntity { };
+
+    protected override async void OnInitialized()
+    {
+        Db = ResolveNamed(nameof(DefaultDataAccess), default) as IDataAccessInterface;
+        await QueryList();
+        base.OnInitialized();
+    }
+
+    private async Task QueryList()
+    {
+        connList = Db.BDA_GetSql().GetConns();
+    }
+
+    private async Task ModiItem(DbConnEntity _target)
+    {
+        selectCode = _target.dbCode;
+        selectConn = _target;
+        _visible = true;
+    }
+
+    private async Task AskDelectItem(DbConnEntity _target)
+    {
+        _dialogShow = true;
+        selectConn = _target;
+    }
+
+    private async Task DelectItem(string _code)
+    {
+        await Db.BDA_GetSql().Delete(_code);
+        await QueryList();
+        _dialogShow = false;
+    }
+
+}

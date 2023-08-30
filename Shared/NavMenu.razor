@@ -1,0 +1,166 @@
+﻿@using Mazinger.DataAccess.User;
+@using Mazinger.DataAccess.Module;
+@inject MazingerNavigationManager Navigation
+@inject MazingerLocalStorage LocalStorage
+@inject MazingerMemoryCache MemoryCache
+@inject ISqlSugarClient Db
+
+<MNavigationDrawer App Class="pt-4 " Color="success" MiniVariant=_navigationMini Width=200 MiniVariantWidth=55 Fixed DisableRouteWatcher>
+
+    <MRow>
+        <MCol Cols="@(_navigationMini?"12":"2")">
+            <MAvatar Class="@($"d-block text-center {(_navigationMini ? "mx-auto" : "mx-4")}")" Color="white darken-1" Size="28">
+                <MImage Src="favicon.ico"></MImage>
+            </MAvatar>
+        </MCol>
+        <MCol Cols="10" hidden=@_navigationMini>
+            <h6 hidden=@_navigationMini style="color:white;text-align:left;margin-left:20px">@("System:ShortName".GetConfigVal())</h6>
+        </MCol>
+    </MRow>
+    <MDivider Class="mx-3 my-5"></MDivider>
+
+
+    <MList Nav Linkage Dense Class="@($"pa-0 {(_navigationMini?"mini-navigation":"")}")">
+        @foreach (var item in _navMenu)
+        {
+
+            if ((item.child is null || !item.child.Any()))
+            {
+                if (string.IsNullOrEmpty(item.url)) break;
+
+                <MBorder Value=false Offset Width=4 Class="rounded-r-1" Border="Borders.Right">
+                    <MListItem Ripple=false Class="mb-4" ActiveClass="fill-lighten-1" OnClick="()=>SelectNav(item)">
+                        <ItemContent>
+                            <MListItemIcon style="margin-right:10px;margin-left:10px">
+                                <MIcon Color="@(item.active ? "blue-grey" :"info")" Size=24 title="@item.title">@item.icon</MIcon>
+                            </MListItemIcon>
+                            <MListItemContent>
+                                <div style="margin-left:6.5px;" class="text-truncate white-space:nowrap @((item.active ? "blue-grey" :"info")+"--text")" >@item.title</div>
+                            </MListItemContent>
+                        </ItemContent>
+                    </MListItem>
+                </MBorder>
+            }
+            else
+            {
+                if (_navigationMini)             
+                {
+                    <MBorder Value=false Offset Width=4 Class="rounded-r-1" Border="Borders.Right">
+                        <MListItem Ripple=false Class="mb-4" ActiveClass="fill-lighten-1" OnClick="()=>{ SelectNav(item);}">
+                            <ItemContent>
+                                <MListItemIcon style="margin-right:10px;margin-left:10px">
+                                    <MIcon Color="info" Size=24 title="@item.title">@item.icon</MIcon>
+                                </MListItemIcon>
+                            </ItemContent>
+                        </MListItem>
+
+                        @foreach (var navChild in item.child)
+                        {
+                            <MListItem Ripple=false Class="mb-4" ActiveClass="fill-lighten-1" OnClick="()=>SelectNav(navChild)" style="@(item.active?"":"display:none;")" title="@navChild.title">
+                                <ItemContent>
+                                    <MListItemIcon style="margin-right:10px;margin-left:10px">
+                                        <MIcon Color="@(navChild.active ? "blue-grey" :"info")" Size=16>@navChild.icon</MIcon>
+                                    </MListItemIcon>
+                                </ItemContent>
+                            </MListItem>
+                        }
+                    </MBorder>
+                }
+                else
+                {
+                    <MListGroup Class="mb-4" Group="@item.child.Select(n => n.url).ToList()" NoAction Dark Color="info">
+                        <ActivatorContent >
+                            <MListItemIcon style="margin-right:10px;margin-left:10px">
+                                <MIcon Color="info" Size=24 title="@item.title">@item.icon</MIcon>
+                            </MListItemIcon>
+                            <MListItemContent>
+                                <div style="margin-left:6.5px;" class="text-truncate white-space:nowrap info--text" title="@item.title">@item.title</div>
+                            </MListItemContent>
+                        </ActivatorContent>
+                        <ChildContent>
+                            @foreach (var navChild in item.child)
+                            {
+                                <MBorder Value=false Offset Width=4 Class="rounded-r-1" Border="Borders.Right" title="@navChild.title">
+                                    <MListItem Ripple=false ActiveClass="fill-lighten-1" Link OnClick="()=>SelectNav(navChild)">
+                                        <ItemContent>                                        
+                                            <MListItemContent>
+                                                <div style="padding-left:42px" class="text-truncate white-space:nowrap @((navChild.active ? "blue-grey" :"info")+"--text")">@navChild.title</div>
+                                            </MListItemContent>
+                                        </ItemContent>
+                                    </MListItem>
+                                </MBorder>
+                            }
+                        </ChildContent>
+                </MListGroup>
+                }
+            }
+        }
+
+    </MList>
+
+
+
+</MNavigationDrawer>
+
+<MButton Small Fab Color="success" Style="@($"bottom:30px;z-index:7;position: fixed;{(_navigationMini ? "left:35px;" : "left:180px;")}")" OnClick="@(()=>{ _navigationMini=!_navigationMini; LocalStorage.Set<bool>("Mazinger_navigationMini",_navigationMini); })">
+    <MIcon Class="white--text">
+        @(_navigationMini ? "mdi-chevron-right" : "mdi-chevron-left")
+    </MIcon>
+</MButton>
+
+@code {
+    [Parameter]
+    public string onLoginUserCode { set; get; }
+    [Parameter]
+    public string onLoginTenantCode { set; get; }
+
+    private List<NavDto> _navMenu = new List<NavDto> { };
+    private bool _navigationMini;
+
+    protected override async void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(onLoginUserCode) && !string.IsNullOrEmpty(onLoginTenantCode))
+        {
+            _navigationMini = await LocalStorage.Get<bool>("Mazinger_navigationMini");
+            var _localUri = Navigation.GetUrl();
+            _navMenu = await MemoryCache.GetOrCreateKeyVal<List<NavDto>>(onLoginUserCode, "ModelLsit", () => Db.GetDb(onLoginTenantCode).Module_GetUserPrivList(onLoginUserCode));
+                        _navMenu.ForEach(_item =>
+            {
+                if ((!string.IsNullOrEmpty(_item.url) && _localUri.ToLower() == _item.url.ToLower()) || (_item.title == "主页" && _localUri == ""))
+                {
+                    _item.active = true;
+                    return;
+                }
+                else
+                {
+                    _item.child.ForEach(_c =>
+                    {
+                        _c.parentTitle = _item.title;
+                        if (!string.IsNullOrEmpty(_c.url) && _localUri.ToLower() == _c.url.ToLower())
+                        {
+                            _item.active = true;
+                            _c.active = true;
+                            return;
+                        }
+                    });
+                }
+            });
+        }
+
+        base.OnInitialized();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SelectNav(NavDto _target)
+    {
+        var _s = _target.active;
+        _navMenu.ForEach(_a => {
+            _a.active = false;
+            _a.child.ForEach(_b => _b.active = false); 
+        });
+        _target.active = !_s;
+        if (_target.pid != 0) _navMenu.Where(_a => _a.id == _target.pid).ForEach(_b => _b.active = true);
+        await InvokeAsync(StateHasChanged);
+        if (!string.IsNullOrEmpty(_target.url)) Navigation.NavigateToByEvent(_target);
+    }
+}

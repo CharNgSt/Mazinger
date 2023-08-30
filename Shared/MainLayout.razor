@@ -1,0 +1,103 @@
+﻿@inherits LayoutComponentBase
+@inject IPopupService PopupService
+@inject MazingerCookieStorage CookieStorage
+@inject MazingerNavigationManager Navigation
+@inject MazingerMemoryCache MemoryCache
+@implements IDisposable
+
+<PageTitle>@("System:Name".GetConfigVal())</PageTitle>
+
+<MApp Id="inspire" >
+    <MErrorHandler OnHandle="OnErrorCallBack">
+        <NavMenu onLoginUserCode="@CookieStorage.LoginUserCode" onLoginTenantCode=@CookieStorage.TenantCode />
+        <MMain Style="@($"background-color:{"System:Color:Background".GetConfigVal()}")">
+            <MAppBar App Flat Style="@($"background-color:{"System:Color:Background".GetConfigVal()}")">
+                <MContainer Class="py-0 fill-height" Fluid>
+                    <MBanner Icon="@(string.IsNullOrEmpty(Navigation.CurrentNav?.icon) ? "mdi-home-circle" : Navigation.CurrentNav?.icon)" IconColor="primary" SingleLine Style="width:100%;">                  
+                        <ChildContent>
+                            <strong class="text-h6 primary--text">
+                                @(string.IsNullOrEmpty(Navigation.CurrentNav?.parentTitle) ? "" : $"{Navigation.CurrentNav?.parentTitle} - ")
+                                @(string.IsNullOrEmpty(Navigation.CurrentNav?.title) ? "主页" : Navigation.CurrentNav?.title)
+                            </strong>
+                        </ChildContent>
+                        <ActionsContent>
+                            <MSpacer></MSpacer>
+                            <MainUserToolsBar loginUserCode=@CookieStorage.LoginUserCode loginUserName=@CookieStorage.LoginUserName />
+                        </ActionsContent>
+                    </MBanner>
+
+                </MContainer>
+            </MAppBar>
+
+            <MContainer Class="py-3 px-6" Fluid >@Body</MContainer>
+        </MMain>
+
+    </MErrorHandler>
+</MApp>
+
+@code {
+    /// <summary>
+    /// 验证登录状态
+    /// </summary>
+    private Timer checkLoginTimer;
+
+    protected override async void OnInitialized()
+    {
+        if (!CookieStorage.CookieIsExists()) Navigation.NavigateTo("/401");
+
+        var _url = Navigation.GetUrl();
+        if (!string.IsNullOrEmpty(_url) && _url != "/")
+        {
+            var _moduleList = await MemoryCache.GetKeyVal<List<NavDto>>(CookieStorage.LoginUserCode, "ModelLsit");
+
+            Console.WriteLine(_url);
+            Console.WriteLine(_moduleList.toJsonStr());
+
+            if (!_moduleList.Where(_a => _a.url == _url || _a.url == $"/{_url}").Any()) Navigation.NavigateTo("/404");
+        }
+        base.OnInitialized();
+    }
+
+    /// <summary>
+    /// 页面加载
+    /// </summary>
+    /// <returns></returns>
+    protected override async Task OnInitializedAsync()
+    {
+        //每分钟验证一次登录状态
+        checkLoginTimer = new Timer(async state =>
+        {
+            var _token = await MemoryCache.GetKeyVal<string>(CookieStorage.LoginUserCode, "AuthToken");
+            if (_token == null || ("System:Setting:Login_ForSingle".GetConfigBool() && CookieStorage.LoginAuthToken != _token))
+            {
+                //取值失败或者配置了单点登录对比token不一致则返回失败
+                Navigation.NavigateTo("/401");
+            }
+            else
+            {
+                //验证通过续订token
+                MemoryCache.SetVal(CookieStorage.LoginUserCode, "AuthToken", _token,TimeSpan.FromMinutes("System:Setting:Login_OverMinutes".GetConfigInt()));
+            }
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
+
+    }
+
+    /// <summary>
+    /// 全局错误捕获
+    /// </summary>
+    /// <param name="_ex"></param>
+    private async void OnErrorCallBack(Exception _ex)
+    {
+        _ex.WriteLog($"Error\\{CookieStorage.TenantCode}");
+        PopupService.EnqueueSnackbarAsync(_ex.Message, AlertTypes.Error);
+    }
+
+    /// <summary>
+    /// 页面释放资源时，需在页首声明 @implements IDisposable
+    /// </summary>
+    public void Dispose()
+    {
+        checkLoginTimer.Dispose();
+        Navigation.OnCurrentNavChanged -= base.StateHasChanged;
+    }
+}

@@ -1,0 +1,155 @@
+﻿<MCard>
+    <MCardText Class="pa-6">
+        <MRow>
+            @foreach (var _qItem in TableItem.QueryItems.Where(_a => _a.Flag).ToList())
+            {
+                <MCol Sm=4 Md=2>
+                    <TableInput qItem=_qItem></TableInput>
+                </MCol>
+            }
+
+            <MCol Sm=4 Md=6>
+                <MButton Rounded class="white--text" XLarge Color="primary" OnClick="()=>GoQuery(true)">
+                    <MIcon Left Dark>mdi-magnify</MIcon>
+                    查询
+                </MButton>
+
+                @if (advancedQuery)
+                {
+                    <MButton Rounded XLarge OnClick="()=>advancedQueryShow=true" style="margin-left:10px">
+                        <MIcon Left>mdi-clipboard-text-search-outline</MIcon>
+                        高级查询
+                    </MButton>
+                }
+
+                @if (addNew)
+                {
+                    <MButton Rounded XLarge Outlined Color="white" class="primary--text" style="margin-left:10px" OnClick=AddNew>
+                        新增
+                        <MIcon Right>mdi-book-plus</MIcon>
+                    </MButton>
+                }
+            </MCol>
+        </MRow>
+    </MCardText>
+</MCard>
+
+@if (advancedQuery)
+{
+    <MNavigationDrawer Stateless Temporary Fixed Right @bind-Value=advancedQueryShow Class="pa-6" Width=PageWidth>
+
+        <div class="block-between mb-6">
+            <span class="text-h6 primary--text">
+                <MIcon Left Color="primary">mdi-clipboard-text-search-outline</MIcon>
+                高级查询
+            </span>
+        </div>
+
+        @foreach (var _qItem in TableItem.QueryItems)
+        {
+            <MRow Class="mt-1">
+                <MCol>
+                    <TableInput qItem=_qItem></TableInput>
+                </MCol>
+            </MRow>
+        }
+
+        <div style="bottom:48px;right:24px;position:absolute">
+            <MButton MinWidth=80 Height=40 Outlined Class="text-btn rounded-pill" OnClick="()=>advancedQueryShow=false"> 关闭 </MButton>
+            <MButton MinWidth=80 Height=40 Outlined Class="text-btn rounded-pill" OnClick=CleanQueryVal> 重置 </MButton>
+            <MButton MinWidth=80 Height=40 Color="primary" Class="ml-6 rounded-pill" OnClick="()=>GoQuery(false)"> 查询 </MButton>
+        </div>
+    </MNavigationDrawer>
+}
+
+@if (addNew)
+{
+    <TableInputItem @bind-TableItem=TableItem @bind-PageShow=TableItem.InputPageShow PageWidth=@PageWidth></TableInputItem>
+}
+
+@code{
+    /// <summary>
+    /// 表单加载对象
+    /// </summary>
+    [Parameter]
+    public TableItemClass TableItem { get; set; }
+    [Parameter]
+    public EventCallback<TableItemClass> TableItemChanged { get; set; }
+    /// <summary>
+    /// 高级查询宽度，默认400
+    /// </summary>
+    [Parameter]
+    public StringNumber PageWidth { get; set; }
+    /// <summary>
+    /// 新增
+    /// </summary>
+    [Parameter]
+    public EventCallback addNewFunc { get; set; }
+    /// <summary>
+    /// 自定义新增按钮事件
+    /// </summary>
+    [Parameter]
+    public EventCallback CustomAddNew { get; set; } 
+    /// <summary>
+    /// 显示新增按钮
+    /// </summary>
+    private bool addNew = false;
+    /// <summary>
+    /// 显示高级按钮
+    /// </summary>
+    private bool advancedQuery = false;
+    /// <summary>
+    /// 高级查询隐藏与显示
+    /// </summary>
+    public bool advancedQueryShow = false;
+
+    /// <summary>
+    /// 首次实例化页面加载函数
+    /// </summary>
+    protected override async void OnInitialized()
+    {
+        if (PageWidth == null) PageWidth = "400";
+        advancedQuery = TableItem.QueryItems.Where(_a => !_a.Flag).Any();
+        addNew = TableItem.InputEntity != null;
+        base.OnInitialized();
+    }
+    /// <summary>
+    /// 新增函数
+    /// </summary>
+    /// <returns></returns>
+    private async Task AddNew()
+    {
+        TableItem.CleanInputItemVal();
+        TableItem.InputIsNew = true;
+
+        if (!CustomAddNew.HasDelegate)
+        {
+            TableItem.InputPageShow = true;
+        }
+        else
+        {
+            await CustomAddNew.InvokeAsync();
+        }
+    }
+    /// <summary>
+    /// 执行查询
+    /// </summary>
+    /// <param name="_isQuick"></param>
+    /// <returns></returns>
+    private async Task GoQuery(bool _isQuick = true)
+    {
+        if (_isQuick) TableItem.QueryItems.Where(_a => !_a.Flag).ForEach(_i => _i.InputVal = null);
+        else advancedQueryShow = false;
+        await TableItem.QueryFunc.InvokeAsync(1);
+    }
+    /// <summary>
+    /// 重置查询条件
+    /// </summary>
+    /// <returns></returns>
+    private async Task CleanQueryVal()
+    {
+        TableItem.QueryItems.ForEach(_i => _i.InputVal = null);
+        await InvokeAsync(StateHasChanged);
+    }
+
+}

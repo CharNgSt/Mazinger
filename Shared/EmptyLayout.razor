@@ -1,0 +1,20 @@
+﻿@inherits LayoutComponentBase
+@inject IPopupService PopupService;
+
+<PageTitle>@("System:Name".GetConfigVal())</PageTitle>
+
+<MApp>
+    <MErrorHandler OnHandle="OnErrorCallBack">
+        <div style="height:100%;margin:0;padding:0;">
+            @Body
+        </div>
+    </MErrorHandler>
+
+</MApp>
+@code {
+
+    private async Task OnErrorCallBack(Exception _ex)
+    {
+        PopupService.EnqueueSnackbarAsync(_ex.Message, AlertTypes.Error);
+    }
+}

@@ -1,0 +1,43 @@
+﻿
+
+<MDialog @bind-Value=TableItem.DialogShow Transition="dialog-right-transition" @bind-MaxWidth=TableItem.DialogWidth Persistent=@(!TableItem.DialogCancelBtnVisable)>
+    <ChildContent>
+        <MCard>
+            <MCardText>
+                <div class="text-h5 pa-12">
+                    <MIcon Color="primary" Size="36">@TableItem.DialogIcon</MIcon>
+                    @TableItem.DialogMsg
+                </div>
+                @if (!string.IsNullOrEmpty(TableItem.DialogSubMsg))
+                {
+                    <div class="text-h7 pa-1">
+                        @TableItem.DialogSubMsg
+                    </div>
+                }
+            </MCardText>
+            <MCardActions Class="justify-end">
+                <MButton Color="primary" OnClick=@(async()=>{ await TableItem.DialogConfirmFunc.InvokeAsync();})>
+                    <MIcon Left Dark Small>mdi-logout</MIcon>
+                    确定
+                </MButton>
+                <MButton Disabled=@(!TableItem.DialogCancelBtnVisable) OnClick="()=>TableItem.DialogShow=false">
+                    取消
+                    <MIcon Right Dark Small>mdi-cancel</MIcon>
+                </MButton>
+            </MCardActions>
+        </MCard>
+    </ChildContent>
+</MDialog>
+
+@code {
+    /// <summary>
+    /// 表单加载对象
+    /// </summary>
+    [Parameter]
+    public TableItemClass TableItem { get; set; }
+    /// <summary>
+    /// 表单对象更新
+    /// </summary>
+    [Parameter]
+    public EventCallback<TableItemClass> TableItemChanged { get; set; }
+}

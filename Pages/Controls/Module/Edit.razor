@@ -1,0 +1,81 @@
+﻿@using Mazinger.DataAccess.Module;
+@inject Func<string, ITransient, object> ResolveNamed
+
+<MNavigationDrawer Temporary Fixed Right Value=Visible ValueChanged=VisibleChanged Width="600" Class="pa-6">
+    <div class="block-between mb-6">
+        <span class="text-h6">@((wId == null || wId == 0 ? "新建" : $"修改")+(pId > 0?"子菜单":""))</span>
+    </div>
+
+    @if (pId > 0)
+    {
+        <MTextField Value="@pName" Class="mb-6" Label="父菜单" Disabled HideDetails="@("auto")" Outlined />
+    }
+
+    <MForm Model=ModuleData EnableValidation OnValidSubmit="SaveModuleDataSubmit">
+        <MTextField @bind-Value="ModuleData.Wml_name" Autofocus Class="mb-6" Label="菜单名" HideDetails="@("auto")" Outlined />
+        <MTextField @bind-Value="ModuleData.Wml_icon" Class="mb-6" Label="图标" HideDetails="@("auto")" Outlined >
+            <PrependInnerContent>
+                <MIcon Size=16 Class="mr-2 neutral-lighten-1--text">@ModuleData.Wml_icon</MIcon>
+            </PrependInnerContent>
+        </MTextField>
+        <MTextField @bind-Value="ModuleData.Wml_purview" Class="mb-6" Label="对应权限" HideDetails="@("auto")" Outlined />
+        <MTextField @bind-Value="ModuleData.Wml_url" Class="mb-6" Label="链接地址" HideDetails="@("auto")" Outlined />
+        <MRadioGroup @bind-Value="openType" Label="操作类型：" Row>
+            <MRadio Label="跳转" Value="@("跳转")" />
+            <MRadio Label="打开新页面" Value="@("打开新页面")" />
+        </MRadioGroup>
+
+        <div style="bottom:48px;right:24px;position:absolute">
+            <MButton MinWidth=80 Height=40 Outlined Class="text-btn rounded-pill" OnClick="async() => await UpdateVisible(false)"> 取消 </MButton>
+            <MButton MinWidth=80 Height=40 Color="primary" Class="ml-6 rounded-pill" Type="submit"> 保存 </MButton>
+        </div>
+    </MForm>
+
+</MNavigationDrawer>
+
+<MySnackbars></MySnackbars>
+
+@code {
+    [Parameter]
+    public decimal? wId { get; set; }
+    [Parameter]
+    public decimal? pId { get; set; }
+    [Parameter]
+    public string? pName { get; set; }
+    [Parameter]
+    public bool Visible { get; set; }
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter]
+    public EventCallback confirmFunc { get; set; }
+
+    private IDataAccessInterface? Db;
+    public ModuleUrlEntity ModuleData { get; set; }
+    private string openType = "跳转";
+
+    protected override void OnParametersSet()
+    {
+        Db = ResolveNamed(nameof(DefaultDataAccess), default) as IDataAccessInterface;
+        ModuleData = Db.BDA_GetSql().Module_GetModuleById(wId);
+        if (ModuleData == null) ModuleData = new ModuleUrlEntity { };
+        openType = ModuleData.Wml_target == 0 ? "跳转" : "打开新页面";
+    }
+
+    private async Task UpdateVisible(bool visible)
+    {
+        if (VisibleChanged.HasDelegate) await VisibleChanged.InvokeAsync(visible);
+        else Visible = visible;
+    }
+
+    private async Task SaveModuleDataSubmit()
+    {
+        ModuleData.Wml_target = openType == "跳转" ? 0 : 1;
+        ModuleData.Wml_pid = pId;
+
+        await Db.BDA_GetSql().Module_Save(ModuleData);
+        await UpdateVisible(false);
+        await confirmFunc.InvokeAsync();
+        MySnackbars.Enqueue(AlertTypes.Success, "保存菜单完毕！");
+    }
+
+}

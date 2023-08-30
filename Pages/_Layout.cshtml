@@ -1,0 +1,50 @@
+﻿@using Microsoft.AspNetCore.Components.Web
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="~/" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="css/masa-blazor-pro.css" rel="stylesheet" />
+    <link href="Mazinger.styles.css" rel="stylesheet" />
+    <link href="_content/Masa.Blazor/css/masa-blazor.min.css" rel="stylesheet">
+    <link href="css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="css/css2.css" rel="stylesheet">
+    <link href="css/all.css" rel="stylesheet">
+    <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
+</head>
+<body>
+ 
+    @RenderBody()
+
+    <script src="_framework/blazor.server.js"></script>
+    <script src="_content/BlazorComponent/js/blazor-component.js"></script>
+    <script>
+        window.setCookie = function (name, value) {
+            document.cookie = `${name}=${escape(value.toString())};path=/;}`;
+        }
+
+        window.getCookie = function (name) {
+            const reg = new RegExp(`(^| )${name}=([^;]*)(;|$)`);
+            const arr = document.cookie.match(reg);
+            if (arr) {
+                return unescape(arr[2]);
+            }
+
+            return null;
+        }
+
+        function inputFocus(_idName) {
+            document.getElementById(_idName).focus();
+        };
+    </script>
+
+
+
+</body>
+
+</html>

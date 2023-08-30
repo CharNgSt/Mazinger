@@ -1,0 +1,40 @@
+﻿@switch (qItem.InputType)
+{
+    default:
+        <MTextField Type=@(nameof(qItem.InputType).ToLower()) @bind-Value=qItem.InputVal Label=@qItem.LabelTxt HideDetails="@("auto")" Outlined Clearable Placeholder="@(string.IsNullOrEmpty(qItem.HolderTxt)?"":$"{qItem.HolderTxt}...")" />
+        break;
+    case InputItemType.Textarea:
+        <MTextarea Label=@qItem.LabelTxt @bind-Value=qItem.InputVal Rows="8" Outlined HideDetails="@("auto")" />
+        break;
+    case InputItemType.Date:
+        <MMenu @bind-Value="qItem.ItemFlag" CloseOnContentClick="false" NudgeRight="40" Transition="scale-transition" OffsetY MinWidth="@("auto")">
+            <ActivatorContent>
+                <MTextField @bind-Value="qItem.InputVal" Label="@qItem.LabelTxt" Readonly @attributes="context.Attrs" Outlined Clearable />
+                @*PrependIcon="mdi-calendar"></MTextField>*@                
+            </ActivatorContent>
+            <ChildContent>
+                <MDatePicker @bind-Value="selectDate" OnInput="@(() =>{ qItem.ItemFlag=false; qItem.InputVal = selectDate?.ToString("yyyy-MM-dd");})"></MDatePicker>
+            </ChildContent>
+        </MMenu>
+        break;
+    case InputItemType.Select:
+        <MSelect Items="qItem.SelectCombox" @bind-Value="qItem.InputVal" ItemText="u => u.Key" ItemValue="u => u.Value" Filled Label="@qItem.LabelTxt" Outlined Clearable BackgroundColor="white" HideDetails="@("auto")"></MSelect>
+        break;
+}
+
+@code {
+    [Parameter]
+    public InputItem qItem { set; get; }
+
+    private DateOnly? selectDate;
+
+    protected override async void OnInitialized()
+    {
+        if (qItem.InputType == InputItemType.Date)
+        {
+            selectDate = null;
+            if (DateOnly.TryParse(qItem.InputVal, out DateOnly _selectDate)) selectDate = _selectDate;
+        }
+    }
+
+}

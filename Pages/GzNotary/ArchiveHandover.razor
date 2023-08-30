@@ -1,0 +1,218 @@
+﻿@*档案交接*@
+@page "/pages/gz/archivehandover"
+@using Aspose.Words;
+@using Aspose.Words.Drawing;
+@inject ISqlSugarClient IDb
+@inject MazingerNavigationManager Navigation
+@inject MazingerCookieStorage CookieStorage
+@inject IJSRuntime JSRuntime 
+
+@if (string.IsNullOrEmpty(CookieStorage.CompanyTenantCode))
+{
+    <h5>您账号所属的单位未绑定数据库访问，无法使用该功能</h5>
+}
+else 
+{
+    <MRow>
+        <MCol Sm=6 Md=6>        
+            <MCard>
+                <MCardText Class="pa-6">   
+                    <MForm Model="queryItem" EnableValidation OnValidSubmit="HandleOnValidSubmit" OnInvalidSubmit="()=>{ }">
+                        <MRow>
+                            <MCol Sm=8 Md=6>
+                                <MTextField id="queryFilenumInput" Type="string" autocomplete="off" Autofocus @bind-Value=queryItem.queryFilenum Label="卷宗号" HideDetails="@("auto")" Outlined Clearable Placeholder="请输入卷宗号，按回车查询..." />
+                            </MCol>
+                            <MCol Sm=4 Md=6>
+                                <MButton Loading="queryItem.loading" Disabled="queryItem.loading" Type="submit" Rounded XLarge Outlined class="white--text" Color="primary" style="margin-left:10px">
+                                    查询
+                                    <MIcon Right Dark>mdi-content-save-move</MIcon>
+                                </MButton>
+
+                                <MButton Loading="queryItem.loading" Disabled="queryItem.loading" Rounded XLarge OnClick=BuildFile class="white--text" Color="primary" style="margin-left:10px">
+                                    <MIcon Left>mdi-file-export</MIcon>
+                                    生成交接表
+                                </MButton>
+
+                                <MButton Loading="queryItem.loading" Disabled="queryItem.loading" Rounded XLarge class="white--text" Color="primary" OnClick="()=>{ deleteVisible=true; }" style="margin-left:10px">
+                                    新的交接
+                                    <MIcon Right>mdi-new-box</MIcon>
+                                </MButton>
+                            </MCol>
+                        </MRow>
+                    </MForm>
+
+                    <MSimpleTable style="height: calc(100vh - 194px);overflow:auto;overflow-x:hidden;" Class="py-2">
+                        <thead>
+                            <tr>
+                                <th class="text-left text--primary" style="width:60px">序号</th>
+                                <th class="text-left text--primary" style="width:100px">卷宗号</th>
+                                <th class="text-left text--primary" style="width:100px">公证员</th>
+                                <th class="text-left text--primary">公证书编号</th>
+                                <th class="text-left text--primary" style="width:120px;margin-right">共 @printList.Count 个卷宗</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (printList.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="5">请输入卷宗并查询....</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                var _index = 0;
+                                @foreach (var _item in printList)                      
+                                {
+                                    _index++;
+
+                                    <tr>
+                                        <td>@_index</td>
+                                        <td>@_item.filenum</td>
+                                        <td>@_item.notaries</td>
+                                        <td>@_item.gznum</td>
+                                        <td>
+                                            <MButton XSmall Color="primary" OnClick="()=> Delete(_item.fileguid)">删除</MButton>
+                                        </td>
+                                    </tr>
+                                }                        
+                            }
+                        </tbody>
+                    </MSimpleTable>
+
+                </MCardText>
+            </MCard>
+        </MCol>
+
+        <MCol Sm=6 Md=6>
+            <MCard>
+                <MCardText Class="pa-6">
+                    @if (pdfUrl == "")
+                    {
+                        <h6>请先查询要交接的卷宗，再点击生成文件</h6>
+                    }
+                    else
+                    {
+                        <iframe src=@(pdfUrl) frameborder=0 style="width:100%;height: calc(100vh - 144px);"></iframe>
+                    }
+                </MCardText>
+            </MCard>
+
+        </MCol>
+    </MRow>
+    <MyDialog @bind-Visible=deleteVisible content="要新建交接单吗？" subContent="未打印的移交表将删除" iconClass="mdi-account-question" cancelBtnVisable=true confirmFunc=NewDetail ></MyDialog>
+}
+@code {
+    class queryDto
+    {
+        /// <summary>
+        /// 查询卷宗号
+        /// </summary>
+        [Required(ErrorMessage = "请输入卷宗号")]
+        public string queryFilenum { get; set; }
+        //// <summary>
+        /// 加载中
+        /// </summary>
+        public bool loading { get; set; }
+    }
+    private queryDto queryItem = new();
+    private string pdfUrl = "";
+    private bool deleteVisible;
+
+    class jzTarget
+    {
+        public string filenum{ set; get; }
+        public string notaries { set; get; }
+        public string fileguid { set; get; }
+        public string gznum { set; get; }
+    }
+    private List<jzTarget> printList = new();
+
+    private async Task HandleOnValidSubmit()
+    {
+        queryItem.queryFilenum = queryItem.queryFilenum.Trim();
+        if (queryItem.loading || string.IsNullOrEmpty(queryItem.queryFilenum)) return;
+        var _tmpFilenum = queryItem.queryFilenum;
+        if (printList.Where(_a => _a.filenum == queryItem.queryFilenum).Any()) 
+        {
+            queryItem.queryFilenum = "";
+            queryItem.loading = false;
+            throw new Exception($"卷宗号为{_tmpFilenum}的案件已在交接单中");
+        }
+
+        queryItem.loading = true;
+        await InvokeAsync(StateHasChanged);
+
+        
+        var _result = IDb.GetDb(CookieStorage.CompanyTenantCode).Ado.SqlQuery<jzTarget>("select filenum,notaries,fileguid from aoi_caseinformation where filenum=@filenum", new { filenum = queryItem.queryFilenum });
+        if (_result == null || !_result.Any())
+        {
+            queryItem.queryFilenum = "";
+            queryItem.loading = false;
+            throw new Exception($"找不到卷宗号为{_tmpFilenum}的案件");
+        }
+
+        var _target = _result[0];
+        var _gzlist = IDb.GetDb(CookieStorage.CompanyTenantCode).Ado.SqlQuery<string>("select yearnumber+number from aoi_affairinformation where caseid=@guid and (diplomaguid='' or diplomaguid=null or diplomaguid like '%Aoi_DTP%') and number<>'' and number is not null order by convert(int,number)", new { guid = _target.fileguid });
+        if (_gzlist != null && !_gzlist.Any()) _target.gznum = "无公证书编号";
+        else
+        {
+            if (_gzlist.Count == 1) _target.gznum = _gzlist[0];
+            else _target.gznum = $"{_gzlist[0]} - {_gzlist[_gzlist.Count - 1]}";
+        }
+        printList.Add(_target);
+        queryItem.loading = false;
+        queryItem.queryFilenum = "";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Delete(string _guid)
+    {
+        queryItem.loading = true;
+        await InvokeAsync(StateHasChanged);
+        printList.Remove(printList.Where(_a => _a.fileguid == _guid).FirstOrDefault());
+        queryItem.loading = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task BuildFile()
+    {
+        if (!printList.Any()) return;
+
+        queryItem.loading = true;
+        await InvokeAsync(StateHasChanged);
+
+        var _fileName = Guid.NewGuid().ToString();
+        var tempFilePath = $"{AppContext.BaseDirectory}TemplateFiles\\广州公证处档案移交.docx".fromFilePathToBase64();
+        Aspose.Words.Document templateDoc = new Aspose.Words.Document(tempFilePath.fromBase64ToMs());
+        Aspose.Words.DocumentBuilder docxBuilder = new Aspose.Words.DocumentBuilder(templateDoc);
+        if (docxBuilder.MoveToBookmark("卷宗数量")) docxBuilder.Write(printList.Count.ToString());
+        if (docxBuilder.MoveToBookmark("打印日期")) docxBuilder.Write(DateTime.Now.ToString("yyyy年MM月dd日"));
+
+        var _tableHtml = "<table style='width:680px'><thead><tr><th style='border:Black solid 1px;padding: 0 0 0 3px;width:60px'>序号</th><th style='border:Black solid 1px;padding: 0 0 0 3px;'>卷宗号</th><th style='border:Black solid 1px;padding: 0 0 0 3px;'>公证员</th><th style='border:Black solid 1px;padding: 0 0 0 3px;' align='left'>公证书编号</th></tr></thead><tbody>";
+        var _index = 0;
+        foreach (var _item in printList)                      
+        {
+            _index++;
+            _tableHtml += $"<tr><td style='border:Black solid 1px;padding: 0 0 0 3px;' align='center'>{_index}</td><td style='border:Black solid 1px;padding: 0 0 0 3px;' align='center'>{_item.filenum}</td><td style='border:Black solid 1px;padding: 0 0 0 3px;' align='center'>{_item.notaries}</td><td style='border:Black solid 1px;padding: 0 0 0 3px;'>{_item.gznum}</td></tr>";
+        }
+        _tableHtml += "</tbody></table>";
+
+        if (docxBuilder.MoveToBookmark("正文")) docxBuilder.InsertHtml(_tableHtml);
+        templateDoc.Save($"{AppContext.BaseDirectory}PdfFile\\{_fileName}.pdf".GetRuntimeDirectory(), SaveFormat.Pdf);
+
+        pdfUrl = $"/pdf/{_fileName}.pdf";
+
+        queryItem.loading = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task NewDetail()
+    {
+        printList = new();
+        pdfUrl = "";
+        deleteVisible = false;
+        await JSRuntime.InvokeVoidAsync("inputFocus", "queryFilenumInput");
+        await InvokeAsync(StateHasChanged);
+
+    }
+}

@@ -1,0 +1,18 @@
+﻿@page "/404"
+@layout EmptyLayout
+@inject MazingerNavigationManager Navigation
+@inject MazingerCookieStorage CookieStorage
+
+<MRow Class="d-flex flex-column justify-center" Style="height:calc(100vh - 132px);">
+    <MContainer Class="d-flex flex-column justify-space-between align-center">
+        <MImage Src="/img/status/404.png" Width="350" Height="200">
+        </MImage>
+        <MRow NoGutters Class="mt-12 text-btn neutral-lighten-2--text"><h5>@(CookieStorage.LoginUserName.MaskName())，您无权限访问该页面或页面不存在 🔐</h5></MRow>
+        <MButton Class="rounded-pill mt-6" Dark Tile Color="primary" OnClick="@(()=>{ Navigation.NavigateTo("/");})">
+            <MIcon Left Dark>
+                mdi-home
+            </MIcon>
+            返回首页
+        </MButton>
+    </MContainer>
+</MRow>

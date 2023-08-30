@@ -1,0 +1,64 @@
+﻿@*<MSimpleTable style="@tableStyleTxt">
+    @if (tableLoading)
+    {
+        <thead>
+            <tr>
+                <th><MProgressLinear Color="primary" Indeterminate></MProgressLinear></th>
+            </tr>
+        </thead>
+    }
+    else if (tableRows == null || tableRows.Count == 0)
+    {
+        <thead>
+            <tr>
+                <th>@(tableRows == null ? "请输入条件并查询..." : "查询结果为空") </th>
+            </tr>
+        </thead>
+    }
+    else
+    {
+        <thead>
+            <tr>
+                @foreach (var _h in tableRows[0])
+                {
+                    <th class="text-left">@_h.ToString()</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @for (var _i = 1; _i < tableRows.Count; _i++)
+            {
+                <tr>
+                    @foreach (var _h in tableRows[_i])
+                    {
+                        <td class="text-left">@_h.ToString()</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    }
+
+</MSimpleTable>
+
+@code {
+    [Parameter]
+    public int tableHeight { set; get; } = 260;
+
+    [Parameter]
+    public bool tableLoading { set; get; }
+    [Parameter]
+    public EventCallback<bool> tableLoadingChanged { get; set; }
+
+    [Parameter]
+    public JArray tableRows { set; get; }
+    [Parameter]
+    public EventCallback<JArray> tableRowsChanged { get; set; }
+
+    private string tableStyleTxt = "";
+    protected override void OnParametersSet()
+    {
+        tableStyleTxt = $"height: calc(100vh-{tableHeight}px);overflow:auto;";
+    }
+
+}
+*@

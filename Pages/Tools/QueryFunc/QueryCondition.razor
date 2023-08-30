@@ -1,0 +1,77 @@
+﻿@*<MBorder Tag="span" Color="primary" Style="border-radius:0;margin: auto 0;">
+    <MCard><MCardText><PBlockText Primary="备注" Secondary=@queryFuncData.queryMemo /></MCardText></MCard>
+    <MCard><MCardText><PBlockText Primary="预计执行时间" Secondary=@($"{(queryFuncData.queryExecMinutes<=1?"少于1":queryFuncData.queryExecMinutes)}分钟") /></MCardText></MCard>
+</MBorder>
+<MBorder Tag="span" Color="warning" Style="border-radius:0;margin: auto 0;" >
+    <MSimpleTable style="max-height:400px;overflow:auto;overflow-x:hidden;">
+        <tbody>
+
+            @if (!hideDbSelect)
+            {
+                <tr>
+                    <td>
+                    <MSelect @bind-Value="queryDbCode" class="mt-4" PrependIcon="mdi-database-search-outline"
+                                Items="connSelect.WhereIF(!string.IsNullOrEmpty(queryFuncData.queryDb), _a=> queryFuncData.queryDb.Contains( _a.dbCode)).ToList()"
+                                Chips
+                                ItemText="u => u.dbName"
+                                ItemValue="u => u.dbCode"
+                                Label="查询数据库"
+                                Clearable BackgroundColor="white">
+                    </MSelect>
+                </td>
+            </tr>
+            }
+
+            @foreach (var _par in parameterList)
+            {
+                <tr @key="_par.Name">
+                    <td>
+                        @switch (_par.Type)
+                        {
+                            case "int":
+                            case "txt":
+                                <MTextField Label="@_par.Name" Type="@(_par.Type=="txt"?"string":"int")" @bind-Value="_par.Value" HideDetails="@("auto")" PrependIcon="@(_par.Type == "txt" ? "mdi-text-box-edit" : "mdi-counter")" />
+                                break;
+                            case "date":
+                                <MMenu @bind-Value="_par.menuFlag" CloseOnContentClick="false" NudgeRight="40" Transition="scale-transition" OffsetY MinWidth="@("auto")">
+                                    <ActivatorContent>
+                                        <MTextField @bind-Value="_par.DateValue" Label="@_par.Name" PrependIcon="mdi-calendar" Readonly @attributes="context.Attrs"></MTextField>
+                                    </ActivatorContent>
+                                    <ChildContent>
+                                        <MDatePicker @bind-Value="_par.DateValue" OnInput="()=>_par.menuFlag=false"></MDatePicker>
+                                    </ChildContent>
+                                </MMenu>
+                                break;
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </MSimpleTable>
+</MBorder>
+@code {
+    [Parameter]
+    public bool hideDbSelect { get; set; } = false;
+
+    [Parameter]
+    public QueryFunctionEntity queryFuncData { get; set; }
+    [Parameter]
+    public EventCallback<QueryFunctionEntity> queryFuncDataChanged { get; set; }
+
+    [Parameter]
+    public List<DbConnDto> connSelect { get; set; }
+    [Parameter]
+    public EventCallback<List<DbConnDto>> connSelectChanged { get; set; }
+
+    [Parameter]
+    public List<ParameterDto> parameterList { get; set; }
+    [Parameter]
+    public EventCallback<List<ParameterDto>> parameterListChanged { get; set; }
+
+    [Parameter]
+    public string queryDbCode { get; set; }
+    [Parameter]
+    public EventCallback<string> queryDbCodeChanged { get; set; }
+
+}
+*@

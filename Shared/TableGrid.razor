@@ -1,0 +1,148 @@
+﻿
+
+<MCard Class="mt-4">
+    <MCardText Class="pa-6">
+        <MDataTable Style="@GridStyle" Headers="TableItem.Headers" Items="TableItem.DataRows" TItem="object" ItemsPerPage="TableItem.PageSize" HideDefaultFooter Class="user ml-2 table-border-none" Loading=TableItem.loading LoadingText="数据加载中...." DisableSort>
+            <HeaderColContent Context="header">
+                <span class="text-subtitle">@header.Text</span>
+            </HeaderColContent>
+            <ItemColContent>
+                @switch (context.Header.Text)
+                {
+                    default:
+                        @context.Item.GetKeyVal(context.Header.Value)
+                        break;
+                    case "操作":
+                        @foreach (var _button in TableItem.Buttons)
+                        {
+                            if (_button.Show(context.Item.GetKeyVal(_button.ShowColVal)))
+                            {
+                                <MButton Small 
+                                    Class="@($"ma-2 {(string.IsNullOrEmpty(_button.Color) ? "primary":"white")}--text")" 
+                                    Outlined=@(string.IsNullOrEmpty(_button.Color)) 
+                                    Color="@_button.Color" 
+                                    OnClick="()=>_button.EventCallback.InvokeAsync(context.Item)"
+                                >
+                                    @if (!string.IsNullOrEmpty(_button.Icon))
+                                    {
+                                        <MIcon Left Dark>
+                                            @_button.Icon
+                                        </MIcon>
+                                    }
+                                    @_button.Name
+                                </MButton>
+                            }
+                        }
+                        break;
+                }
+            </ItemColContent>
+        </MDataTable>
+    </MCardText>
+    <MCardText>
+        <MRow class="d-flex">
+            <MCol Md=6 Lg=6>
+                共 @TableItem.CurrentCount 条数据
+            </MCol>
+            <MCol Md=6 Lg=6 style="text-align:right">
+                @if (!TableItem.loading)
+                {
+                    <MButton class="mx-2" Rounded XSmall OnClick=OnPrevious> <MIcon>mdi-chevron-left</MIcon> </MButton>
+                    @if (TableItem.PageCount > 7)
+                    {
+                        if (TableItem.PageIndex < 5)
+                        {
+                            for (int _page = 1; _page <= 5; _page++)
+                            {
+                                int pageTxt = _page;
+                                <MButton class="mx-2" Rounded Color="@(pageTxt==TableItem.PageIndex?"primary":"")" XSmall OnClick="()=>GoQuery(pageTxt)"> @pageTxt </MButton>
+                            }
+                            <span class="mx-2 text-center" style="width:36px">...</span>
+                            <MButton class="mx-2" Rounded Color="@(TableItem.PageCount==TableItem.PageIndex?"primary":"")" XSmall OnClick="()=>GoQuery(TableItem.PageCount)"> @TableItem.PageCount </MButton>
+                        }
+                        else if (TableItem.PageIndex + 5 > TableItem.PageCount)
+                        {
+
+                            <MButton class="mx-2" Rounded Color="@(1==TableItem.PageIndex?"primary":"")" XSmall OnClick="()=>GoQuery(1)"> 1 </MButton>
+                            <span class="mx-2 text-center" style="width:36px">...</span>
+                            for (int _page = TableItem.PageCount - 4; _page <= TableItem.PageCount; _page++)
+                            {
+                                int pageTxt = _page;
+                                <MButton class="mx-2" Rounded Color="@(pageTxt==TableItem.PageIndex?"primary":"")" XSmall OnClick="()=>GoQuery(pageTxt)"> @pageTxt </MButton>
+                            }                
+                        }
+                        else
+                        {
+                            <MButton class="mx-2" Rounded Color="@(1==TableItem.PageIndex?"primary":"")" XSmall OnClick="()=>GoQuery(1)"> 1 </MButton>
+                            <span class="mx-2 text-center" style="width:36px">...</span>
+
+                            for (int _page = TableItem.PageIndex - 1; _page <= TableItem.PageIndex+1; _page++)
+                            {
+                                int pageTxt = _page;
+                                <MButton class="mx-2" Rounded Color="@(pageTxt==TableItem.PageIndex?"primary":"")" XSmall OnClick="()=>GoQuery(pageTxt)"> @pageTxt </MButton>
+                            }
+
+                            <span class="mx-2 text-center" style="width:36px">...</span>
+                            <MButton class="mx-2" Rounded Color="@(TableItem.PageCount==TableItem.PageIndex?"primary":"")" XSmall OnClick="()=>GoQuery(TableItem.PageCount)"> @TableItem.PageCount </MButton>
+                        }            
+                    }
+                    else
+                    {
+                        for (int _page = 1; _page <= TableItem.PageCount; _page++)
+                        {
+                            int pageTxt = _page;
+                            <MButton class="mx-2" Rounded Color="@(pageTxt==TableItem.PageIndex?"primary":"")" XSmall OnClick="()=>GoQuery(pageTxt)"> @pageTxt </MButton>
+                        }
+                    }
+                    <MButton class="mx-2" Rounded XSmall OnClick=OnNext> <MIcon>mdi-chevron-right</MIcon> </MButton>
+                 
+                }
+            </MCol>
+        </MRow>
+    </MCardText>
+</MCard>
+
+@code {
+    /// <summary>
+    /// 表单加载对象
+    /// </summary>
+    [Parameter]
+    public TableItemClass TableItem { get; set; }
+    /// <summary>
+    /// 表单对象更新
+    /// </summary>
+    [Parameter]
+    public EventCallback<TableItemClass> TableItemChanged { get; set; }
+
+    /// <summary>
+    /// 执行查询
+    /// </summary>
+    /// <returns></returns>
+    private async Task GoQuery(int _pageIndex)
+    {
+        await TableItem.QueryFunc.InvokeAsync(_pageIndex);
+    }
+
+    /// <summary>
+    /// 上一页
+    /// </summary>
+    /// <returns></returns>
+    private async Task OnPrevious()
+    {
+        if (TableItem.PageIndex - 1 >= 1) await GoQuery(TableItem.PageIndex - 1);
+    }
+
+    /// <summary>
+    /// 下一页
+    /// </summary>
+    /// <returns></returns>
+    private async Task OnNext()
+    {
+        if (TableItem.PageIndex + 1 <= TableItem.PageCount) await GoQuery(TableItem.PageIndex +1);
+    }
+
+    /// <summary>
+    /// 表单高度样式，默认 ‘height: calc(100vh - 334px);’
+    /// </summary>
+    [Parameter]
+    public string GridStyle { get; set; } = "height: calc(100vh - 314px);";
+}

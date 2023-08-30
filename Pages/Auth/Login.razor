@@ -1,0 +1,41 @@
+﻿@page "/pages/auth/login"
+@page "/pages/auth/login/{tenantCode}"
+@inject MazingerCookieStorage CookieStorage
+@layout EmptyLayout
+
+<MRow Class="max-height ma-0">
+    <MCol Md=4 Sm=12 Class="neutral-lighten-5" style="background-image:url(/img/login/left.jpg);background-repeat: no-repeat;background-position: left top;">
+        <MRow>
+            <MCol Md=3 Lg=2 Sm=4><image class="ml-12 mt-12" style="height:40px;" src="/favicon.ico"></image> </MCol>
+            <MCol Md=9 Lg=10 Sm=8><div style="margin-top:44px"><span class="info--text text-h4">@("System:Name".GetConfigVal())</span></div></MCol>
+        </MRow>
+        <div class="d-flex pb-12" style="height: calc(100% - 88px);">
+            <div style="width:450px;" class="ma-auto">
+                <h4 class="neutral-lighten-1--text">@("System:SloganTitle".GetConfigVal())</h4>
+                <div class="mt-12 neutral-lighten-1--text">
+                    @("System:SloganMemo".GetConfigVal())
+                </div>
+            </div>
+        </div>
+    </MCol>
+    <MCol Md=8 Sm=12 Class="fill-lighten-1 block-center">
+        <LoginInput></LoginInput>
+    </MCol>
+</MRow>
+
+@code {
+    /// <summary>
+    /// 租户代码
+    /// </summary>
+    [Parameter]
+    public string tenantCode { get; set; }
+
+    protected override async void OnInitialized()
+    {
+        if (string.IsNullOrEmpty(tenantCode)) tenantCode = "System:Db:Code".GetConfigVal();
+        CookieStorage.TenantCode = tenantCode;
+        base.OnInitialized();
+    }
+
+
+}

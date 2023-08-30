@@ -1,0 +1,16 @@
+﻿<PEnqueuedSnackbars @ref="_enqueuedSnackbars" Closeable=true MaxCount="5" Timeout=4000 Position="@SnackPosition.TopRight"></PEnqueuedSnackbars>
+
+@code {
+
+    private static PEnqueuedSnackbars? _enqueuedSnackbars;
+    
+    public static void Enqueue(AlertTypes type, string _content)
+    {
+        _enqueuedSnackbars?.EnqueueSnackbar(new SnackbarOptions()
+            {
+                Content = _content,
+                Type = type,
+                Timeout = 4000,
+            });
+    }
+}

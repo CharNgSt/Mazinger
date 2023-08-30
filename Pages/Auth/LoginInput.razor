@@ -1,0 +1,189 @@
+﻿@using Mazinger.DataAccess.User
+@using Mazinger.DataAccess.Module
+@inject MazingerCookieStorage CookieStorage
+@inject MazingerNavigationManager Navigation
+@inject MazingerMemoryCache MemoryCache
+@inject Func<string, ITransient, object> ResolveNamed
+
+<MCard Width=510 Height=680 Class="mx-auto my-auto" >
+    <div style="height:60px;"></div>
+    <div class="mt-2 mx-auto text-center" style="width:420px;">
+
+        <h5 class="mt-2 mb-12">@("System:Welcome".GetConfigVal())</h5>
+        <MForm Model="_model" EnableValidation OnValidSubmit="HandleOnValidSubmit" OnInvalidSubmit="()=>{ }">
+
+            <MTextField Autofocus TValue="string" @bind-Value="_model._userCode" Label="账号" Placeholder="请输入您的账号..." Outlined HideDetails="@("auto")"></MTextField>
+
+            <MTextField TValue="string" @bind-Value="_model._userPwd" Class="mt-10" Label="密码" Type="@(_show ? "text" : "password")" Placeholder="请输入登录密码..." 
+            AppendIcon="@(_show ? "mdi-eye" : "mdi-eye-off")" OnAppendClick="()=>_show = !_show" Outlined HideDetails="@("auto")"></MTextField>
+            
+            <MRow NoGutters>
+                <MCol Class="mt-10" Md="7" Lg="8">                
+                    <MTextField TValue="string" @bind-Value="_model._userVerifyCode" Label="验证码" Placeholder="请输入验证码..." Outlined HideDetails="@("auto")"></MTextField>
+                </MCol>
+                <MCol Class="mt-10" Md="5" Lg="4">
+                    <img src="@_v_code_base64" style="height:56px;" />
+                </MCol>
+            </MRow>
+
+            <span class="d-flex justify-end mt-1 text-caption hover-pointer" style="margin-top:5px;margin-right:10px"
+                    @onclick=@(()=>{ RefVerifyCode(); })>
+                看不清？点击换一张
+            </span>
+
+            <MButton Loading="_model.loading" Disabled="_model.loading" Type="submit" Class="mt-11 rounded-4 text-btn white--text" Height=46 Width=340 Color="success">
+            登  录
+            </MButton>
+        </MForm>
+    
+    </div>
+</MCard>
+
+<MySnackbars></MySnackbars>
+
+@code
+{
+    private bool _show;
+    private LoginDto _model = new();
+    private string _v_code_base64 = "";
+    private IDataAccessInterface? Db;
+
+    protected override async void OnInitialized()
+    {
+        Db = ResolveNamed(nameof(DefaultDataAccess), default) as IDataAccessInterface;
+
+        CookieStorage.LoginUserCode = "";
+        CookieStorage.LoginUserName = "";
+        _model.defaultToken = Guid.NewGuid().ToString();
+
+
+        #if DEBUG
+
+    _model._userCode = "mossadmin";
+    _model._userPwd = "Pass@word1";
+
+        #endif
+
+        _model.loading = false;
+
+        RefVerifyCode();
+
+        base.OnInitialized();
+    }
+
+    private async Task RefVerifyCode()
+    {
+        MemoryCache.GetOrResetVerifyCode(_model.defaultToken);
+        _v_code_base64 = $"data:image/png;base64,{await MemoryCache.GetVerifyCodeImg(_model.defaultToken)}";
+    }
+
+
+    private async Task HandleOnValidSubmit()
+    {
+        _model.loading = true;
+        try
+        {
+            var _login = await GetLogin(new LoginDto
+            {
+                _userCode = DESCEncryption.Encrypt(_model._userCode.ToUpper(), _model.defaultToken),
+                _userPwd = DESCEncryption.Encrypt(MD5Encryption.Encrypt(MD5Encryption.Encrypt(_model._userPwd, true, false) + _model._userVerifyCode.ToUpper(), true, false), _model.defaultToken),
+                defaultToken = _model.defaultToken
+            });
+
+            if (_login.login)
+            {
+                CookieStorage.LoginUserCode = _login.userCode;
+                CookieStorage.LoginUserName = _login.userName;
+                CookieStorage.LoginAuthToken = _login.authorizationToken;
+                CookieStorage.CompanyTenantCode = _login.comDbCode;
+
+                MySnackbars.Enqueue(AlertTypes.Success, "登录成功");
+                await Task.Delay(1000);
+                Navigation.NavigateTo(_login.mainPage);
+            }
+            else throw new Exception($"登录失败，{_login.msg}");
+        }
+        catch (Exception ex) { throw ex; }
+        finally
+        {
+            _model._userVerifyCode = "";
+            RefVerifyCode();
+            _model.loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+
+    /// <summary>
+    /// 登录系统
+    /// </summary>
+    /// <param name="_dto"></param>
+    /// <returns></returns>
+    public async Task<LoginResultDto> GetLogin(LoginDto _dto)
+    {
+        var _verifyCode = await MemoryCache.GetVerifyCode(_dto.defaultToken);
+        _dto._userCode = _dto._userCode.DescDecode(_dto.defaultToken);
+        _dto._userPwd = _dto._userPwd.DescDecode(_dto.defaultToken);
+
+        var _user = Db.BDA_GetSql().User_GetSaveDto(_dto._userCode); //  User_GetEntity(_dto._userCode);
+        var _result = false;
+        var _msg = "";
+        if (_user != null)
+        {
+            Console.WriteLine(_user.toJsonStr());
+
+            if (_user.userFreezetime != null && _user.userFreezetime > DateTime.Now) _msg = "您的帐号因为输入密码错误多次被冻结";
+            else
+            {
+                int _maxFail = "System:Setting:Login_MaxFailTime".GetConfigInt();
+                string _pwd = _dto._userPwd;
+                string _d_psd_md5 = _user.userPwd;
+                string _s_psd = (_d_psd_md5.ToUpper() + _verifyCode.ToUpper()).MD5Encode();
+                decimal? _f_t = _user.userFailedtime;
+
+                _result = _s_psd.ToUpper() == _pwd.ToUpper();
+                if (!_result)
+                {
+                    _msg = "密码或验证码错误";
+                    //登录失败
+                    if (!_result && _maxFail > 0)
+                    {
+                        _f_t = _f_t == null ? 0 : _f_t;
+                        _f_t = _f_t + 1;
+
+                        if (_f_t > _maxFail - 1) Db.BDA_GetSql().User_UpdateTryTime(_user.userCode, 0, DateTime.Now);
+                        else Db.BDA_GetSql().User_UpdateTryTime(_user.userCode, _f_t);
+                    }
+                }
+                else
+                {
+                    Db.BDA_GetSql().User_UpdateLastLoginTime(_user.userCode);
+
+                    //构建缓存用户权限
+                    MemoryCache.SetVal(_user.userCode, "ModelLsit", Db.BDA_GetSql().Module_GetUserPrivList(_user.userCode));
+
+                    //构建缓存用户登录token
+                    var _authToken = Guid.NewGuid().ToString();
+                    MemoryCache.SetVal(_user.userCode, "AuthToken", _authToken, TimeSpan.FromMinutes("System:Setting:Login_OverMinutes".GetConfigInt()));
+
+                    return new LoginResultDto
+                    {
+                        login = true,
+                        userCode = _user.userCode,
+                        userName = _user.userName,
+                        authorizationToken = _authToken,
+                        mainPage = _user.mainPage,
+                        companyName = _user.companyName,
+                        comDbCode = _user.companyDbCode,
+                        deptName = _user.deptName,
+                        dutyName = _user.dutyName,
+                        techName = _user.techName
+                    };
+                }
+            }
+        }
+        else _msg = "用户不存在";
+        return new LoginResultDto { login = false, msg = _msg };
+    }
+
+}

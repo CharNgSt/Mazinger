@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\" />
+    <Folder Include="PdfFile\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BlazorDownloadFile" Version="2.4.0.2" />
+    <PackageReference Include="Blazored.LocalStorage" Version="4.3.0" />
+    <PackageReference Include="Furion" Version="4.8.8.33" />
+    <PackageReference Include="Furion.Extras.ObjectMapper.Mapster" Version="4.8.8.33" />
+    <PackageReference Include="Masa.Blazor" Version="1.0.0-rc.1" />
+    <PackageReference Include="SqlSugarCore" Version="5.1.4.88" />
+    <PackageReference Include="ZKWeb.System.Drawing" Version="4.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Aspose.Words">
+      <HintPath>..\Dlls\Aspose.Words.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

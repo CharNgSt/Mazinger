@@ -1,0 +1,76 @@
+﻿@inject MazingerNavigationManager Navigation
+
+<MMenu OffsetY OffsetX Bottom>
+    <ActivatorContent>
+        <div Color="primary" @attributes="@context.Attrs" class="hover-pointer ml-6 mr-5 neutral-lighten-4--text text-center">
+            <MIcon Color="primary" Size=16>mdi-cog</MIcon>
+            <span class="primary--text">设置</span>
+            <MIcon Color="primary"  Size=12>mdi-chevron-down</MIcon>
+        </div>
+    </ActivatorContent>
+    <ChildContent>
+        <MList Class="py-0">
+            <MListItem>
+                <MListItemContent>
+                    <MListItemTitle>
+                        @($"{loginUserName}，您好")
+                    </MListItemTitle>
+                </MListItemContent>
+            </MListItem>
+            
+            <MDivider></MDivider>
+
+            <MListItem>
+                <MListItemContent>
+                    <MListItemTitle>
+                        <MButton Small Color="white" OnClick="()=>changePwdVisable=true">
+                            修改密码
+                            <MIcon Right Dark>
+                                mdi-form-textbox-password
+                            </MIcon>
+                        </MButton>
+                    </MListItemTitle>
+                </MListItemContent>
+            </MListItem>
+
+            <MListItem>
+                <MListItemContent>
+                    <MListItemTitle>
+                        <MButton Small Color="white" OnClick="()=>logOutVisable=true">
+                            退出登录
+                            <MIcon Right Dark>
+                                mdi-logout
+                            </MIcon>
+                        </MButton>
+                    </MListItemTitle>
+                </MListItemContent>
+            </MListItem>
+        </MList>
+    </ChildContent>
+</MMenu>
+
+
+<MyDialog @bind-Visible=logOutVisable iconClass="mdi-account-question" content="确定要退出系统吗？" cancelBtnVisable=true confirmFunc="@(() =>{ Navigation.NavigateTo("/pages/auth/login"); })" />
+
+<Mazinger.Pages.Auth.UserChangePwd canCancel=true @bind-changePwdVisable=changePwdVisable loginUserCode=loginUserCode tenantCode=tenantCode />
+
+@code{
+    /// <summary>
+    /// 登录用户账号
+    /// </summary>
+    [Parameter]
+    public string loginUserCode { set; get; }
+    /// <summary>
+    /// 登录用户姓名
+    /// </summary>
+    [Parameter]
+    public string loginUserName { set; get; }
+    /// <summary>
+    /// 数据库租户
+    /// </summary>
+    [Parameter]
+    public string tenantCode { set; get; }
+
+    private bool logOutVisable = false;
+    private bool changePwdVisable = false;
+}

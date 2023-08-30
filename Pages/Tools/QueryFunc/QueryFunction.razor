@@ -1,0 +1,80 @@
+﻿@*@page "/pages/content/queryfunction"
+@inject Func<string, ITransient, object> ResolveNamed
+
+<MNavigationDrawer Temporary Fixed Right Value=Visible ValueChanged=VisibleChanged Class="pa-6" style="width: calc(100vw - 400px);" Stateless>
+    <div class="block-between mb-6">
+        <span class="text-h6">@queryFuncData.queryName</span>
+    </div>
+        
+    <MRow Class="py-3 mb-6">
+        <MCol Sm=8 Md="9">            
+            <QueryResultTable @bind-tableLoading=loading @bind-tableRows=_rows />
+        </MCol>
+        <MCol Sm=4 Md=3>
+            <QueryCondition @bind-connSelect=connSelect @bind-queryFuncData=queryFuncData @bind-parameterList=parameterList @bind-queryDbCode=queryDbCode></QueryCondition>
+            <div style="bottom:48px;right:24px;position:absolute">
+                <MButton MinWidth=80 Height=40 Outlined Class="text-btn rounded-pill" OnClick="async() => await UpdateVisible(false)" Disabled=loading> 关闭 </MButton>
+                <MButton MinWidth=80 Height=40 Color="primary" Class="ml-6 rounded-pill" OnClick=TryExecSql Disabled=loading> 查询 </MButton>
+            </div>
+        </MCol>
+    </MRow>
+</MNavigationDrawer>
+
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter]
+    public QueryFunctionEntity queryFuncData { get; set; }
+    [Parameter]
+    public List<DbConnDto> connSelect { get; set; }
+    
+    private IDataAccessInterface? Db;
+    private List<ParameterDto> parameterList = new List<ParameterDto> { };
+    private string queryDbCode = "";
+    private bool loading = false;
+    private JArray _rows = null;
+
+    protected override async void OnInitialized()
+    {
+        Db = ResolveNamed(nameof(DefaultDataAccess), default) as IDataAccessInterface;
+        base.OnInitialized();
+    }
+
+    protected override void OnParametersSet()
+    {
+        _rows = null;
+        if (queryFuncData == null) return;
+        queryDbCode = "";
+        if (!string.IsNullOrEmpty(queryFuncData.queryDb) && queryFuncData.queryDb.Split(',').Length == 1) queryDbCode = queryFuncData.queryDb.Split(',')[0];
+
+        parameterList = new List<ParameterDto> { };
+        parameterList = Idb.GetParameters(queryFuncData.queryGuid).Select(_a => new ParameterDto { Name = _a.parameterName, Type = _a.parameterType, Value = "", DateValue = null }).ToList();
+    }
+
+    private async Task UpdateVisible(bool visible)
+    {
+        if (VisibleChanged.HasDelegate) await VisibleChanged.InvokeAsync(visible);
+        else Visible = visible;
+    }
+
+    private async Task TryExecSql()
+    {
+        if (string.IsNullOrEmpty(queryDbCode)) throw new Exception("请选择要查询的数据库");
+
+        try
+        {
+            loading = true;
+            _rows = Idb.ExecSql(queryDbCode, queryFuncData.querySql, parameterList);
+            await Task.Delay(1000);
+            loading = false;
+        }
+        catch(Exception ex) 
+        {
+            loading = false;
+            throw ex; 
+        }
+    }
+}*@

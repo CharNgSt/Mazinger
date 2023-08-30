@@ -1,0 +1,17 @@
+﻿@page "/500"
+@inject MazingerNavigationManager Navigation
+@layout EmptyLayout
+
+<MRow Class="d-flex flex-column justify-center" Style="height:calc(100vh - 132px);">
+    <MContainer Class="d-flex flex-column justify-space-between align-center">
+        <MImage Src="/img/status/500.png" Width="350" Height="200">
+        </MImage>
+        <MRow NoGutters Class="mt-12 text-btn neutral-lighten-2--text"><h5>噢！系统出错了 .😖</h5></MRow>
+        <MButton Class="rounded-pill mt-6" Dark Tile Color="primary" OnClick="@(()=>{ Navigation.NavigateTo("/");})">
+            <MIcon Left Dark>
+                mdi-home
+            </MIcon>
+            返回首页
+        </MButton>
+    </MContainer>
+</MRow>

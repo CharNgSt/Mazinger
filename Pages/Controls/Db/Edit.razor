@@ -1,0 +1,81 @@
+﻿@using Mazinger.DataAccess.DbConn;
+@inject Func<string, ITransient, object> ResolveNamed
+@inject MazingerCookieStorage CookieStorage
+
+<MNavigationDrawer Temporary Fixed Right Value=Visible ValueChanged=VisibleChanged Width="600" Class="pa-6">
+    <div class="block-between mb-6">
+        <span class="text-h6">@((string.IsNullOrEmpty(selectCode) ? "新建" : $"修改"))</span>
+    </div>
+    <MForm Model=ConnData EnableValidation OnValidSubmit="SaveConnDataSubmit">
+
+        <MTextField @bind-Value="ConnData.dbCode" Autofocus Disabled=@(!string.IsNullOrEmpty(selectCode)) Class="mb-6" Label="数据库代码" HideDetails="@("auto")" Outlined />
+
+        <MTextField @bind-Value="ConnData.dbName" Class="mb-6" Label="数据库名" HideDetails="@("auto")" Outlined />
+
+        <MSelect Items="dbTypeList" @bind-Value="ConnData.dbType" ItemText="u => u.Label" ItemValue="u => u.Value" Filled Label="数据库类型："></MSelect>
+
+        <MTextarea Label="数据连接串" @bind-Value=ConnData.dbConn NoResize Rows="8" Outlined  class="mt-4" />
+
+        <div style="bottom:48px;right:24px;position:absolute">
+            <MButton MinWidth=80 Height=40 Outlined Class="text-btn rounded-pill" OnClick="async() => await UpdateVisible(false)"> 取消 </MButton>
+            <MButton MinWidth=80 Height=40 Color="primary" Class="ml-6 rounded-pill" Type="submit"> 保存 </MButton>
+        </div>
+    </MForm>
+
+</MNavigationDrawer>
+
+<MySnackbars></MySnackbars>
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+    [Parameter]
+    public string? selectCode { get; set; }
+    [Parameter]
+    public DbConnEntity ConnData { get; set; }
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter]
+    public EventCallback confirmFunc { get; set; }
+    public class Item
+    {
+        public string Label { get; set; }
+        public string Value { get; set; }
+        public Item(string label, string value)
+        {
+            Label = label;
+            Value = value;
+        }
+    }
+    private List<Item> dbTypeList = new()
+    {
+        new Item("SQLSERVER", "SQLSERVER"),
+        new Item("ORACLE", "ORACLE"),
+        new Item("SQLITE", "SQLITE"),
+        new Item("DM", "DM"),
+        new Item("MYSQL", "MYSQL"),
+    }; 
+    
+    private IDataAccessInterface? Db;
+    
+    protected override void OnParametersSet()
+    {
+        Db = ResolveNamed(nameof(DefaultDataAccess), default) as IDataAccessInterface;
+    }
+
+    private async Task UpdateVisible(bool visible)
+    {
+        if (VisibleChanged.HasDelegate) await VisibleChanged.InvokeAsync(visible);
+        else Visible = visible;
+    }
+
+    private async Task SaveConnDataSubmit()
+    {
+        ConnData.dbCreateDay = DateTime.Now;
+        ConnData.dbCreateUser = CookieStorage.LoginUserName;
+        await Db.BDA_GetSql().Save(ConnData, string.IsNullOrEmpty(selectCode));
+        await UpdateVisible(false);
+        await confirmFunc.InvokeAsync();
+        MySnackbars.Enqueue(AlertTypes.Success, "保存数据库完毕！");
+    }
+}

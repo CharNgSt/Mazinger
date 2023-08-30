@@ -1,0 +1,85 @@
+﻿@page "/pages/controls/users"
+@using Mazinger.DataAccess.User;
+@inject Func<string, ITransient, object> ResolveNamed
+
+<TableQueryItem @bind-TableItem=_tc PageWidth=400 CustomAddNew="@(()=>{ pageShow=true;  })"></TableQueryItem>
+<TableGrid @bind-TableItem=_tc></TableGrid>
+<TableDialog @bind-TableItem=_tc></TableDialog>
+<MySnackbars></MySnackbars>
+<Edit @bind-TableItem=_tc @bind-PageShow=pageShow ></Edit>
+
+
+@code {
+    private IDataAccessInterface? Db;
+    private TableItemClass _tc;
+    private bool pageShow;
+
+    protected override async void OnInitialized()
+    {
+        Db = ResolveNamed(nameof(UserDataAccess), default) as IDataAccessInterface;
+        _tc = new TableItemClass
+            {
+                Headers = Db.TableHeader(),
+                QueryItems = Db.TableQueryItem(),
+                QueryFunction = Db.QueryFunc,
+                Buttons = new List<TableButtonClass>
+                        {
+                            new TableButtonClass{
+                                Name="修改",
+                                Color="primary",
+                                Icon="mdi-file-settings-outline",
+                                EventCallback = EventCallback.Factory.Create<object?>(this, _obj =>{
+                                    _tc.SetInputItemsVal<UserEntity>(_obj);
+                                    _tc.InputIsNew = false;
+                                    pageShow = true;
+                                })
+                            },
+                            new TableButtonClass{
+                                Name="冻结",
+                                Icon="mdi-snowflake-alert",
+                                EventCallback = EventCallback.Factory.Create<object?>(this, _obj =>
+                                {
+                                    var _target = _obj.Adapt<UserEntity>();
+                                    Db.BDA_GetSql().User_Freeze(_target.userCode,true);
+                                    MySnackbars.Enqueue(AlertTypes.Success, $"账号【{_target.userName}】冻结完毕！");
+                                    _tc.QueryFunc.InvokeAsync(_tc.PageIndex);
+                                }),
+                                ShowColVal = nameof(UserEntity.userFreezetime),
+                                Show = value => string.IsNullOrEmpty(value as string)
+                            },
+                            new TableButtonClass{
+                                Name="解冻",
+                                Icon="mdi-snowflake-off",
+                                EventCallback = EventCallback.Factory.Create<object?>(this,  _obj =>
+                                {
+                                    var _target = _obj.Adapt<UserEntity>();
+                                    Db.BDA_GetSql().User_Freeze(_target.userCode,false);
+                                    MySnackbars.Enqueue(AlertTypes.Success, $"账号【{_target.userName}】解冻完毕！");
+                                    _tc.QueryFunc.InvokeAsync(_tc.PageIndex);
+                                }),
+                                ShowColVal = nameof(UserEntity.userFreezetime),
+                                Show = value => !string.IsNullOrEmpty(value as string)
+                            }
+                        },
+                QueryFunc = EventCallback.Factory.Create<int>(this, async value =>
+                {
+                    _tc.StartLoading();
+                    await InvokeAsync(StateHasChanged);
+                    _tc.ExecQuery(value);
+                    await InvokeAsync(StateHasChanged);
+                }),
+
+                InputPageName = "用户",
+                InputEntity = Db.InputEntity(),
+                InputItems = Db.DefaultInputItems(),
+                SaveFunc = EventCallback.Factory.Create(this, async () =>
+                {
+                    await Db.SaveFunc(_tc.InputItems, _tc.InputIsNew);
+                    await InvokeAsync(StateHasChanged);
+                }),
+            };
+
+        await _tc.QueryFunc.InvokeAsync(1);
+        base.OnInitialized();
+    }
+}

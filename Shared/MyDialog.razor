@@ -1,0 +1,60 @@
+﻿
+
+<MDialog @bind-Value="Visible" Transition="dialog-right-transition" MaxWidth="@(maxWidth != null ? maxWidth : 440)" Persistent=@(!cancelBtnVisable)>
+    <ChildContent>
+        <MCard>
+            <MCardText>
+                <div class="text-h5 pa-12">
+                    <MIcon Color="primary" Size="36">@iconClass</MIcon>
+                    @content
+                </div>
+                @if (!string.IsNullOrEmpty(subContent))
+                {
+                    <div class="text-h7 pa-1">
+                        @subContent
+                    </div>
+                }
+            </MCardText>
+            <MCardActions Class="justify-end">
+                <MButton Color="primary" OnClick=@(async()=>{ await confirmFunc.InvokeAsync();})>
+                    <MIcon Left Dark Small>mdi-logout</MIcon>
+                    确定
+                </MButton>
+                <MButton Disabled=@(!cancelBtnVisable) OnClick="async() => await UpdateVisible(false)">
+                    取消
+                    <MIcon Right Dark Small>mdi-cancel</MIcon>
+                </MButton>
+            </MCardActions>
+        </MCard>
+    </ChildContent>
+</MDialog>
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter]
+    public StringNumber? maxWidth { get; set; }
+    [Parameter]
+    public string iconClass { get; set; }
+    [Parameter]
+    public string content { get; set; }
+    [Parameter]
+    public EventCallback<string> contentChanged { get; set; }
+    [Parameter]
+    public string subContent { get; set; }
+    [Parameter]
+    public EventCallback<string> subContentChanged { get; set; }
+    [Parameter]
+    public bool cancelBtnVisable { get; set; }
+    [Parameter]
+    public EventCallback confirmFunc { get; set; }
+
+    private async Task UpdateVisible(bool visible)
+    {
+        if (VisibleChanged.HasDelegate) await VisibleChanged.InvokeAsync(visible);
+        else Visible = visible;
+    }
+
+}

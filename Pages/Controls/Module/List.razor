@@ -1,0 +1,224 @@
+﻿@page "/pages/controls/modules"
+@using Mazinger.DataAccess.Module;
+@inject Func<string, ITransient, object> ResolveNamed
+
+<MCard>
+    <MCardText Class="pa-6">
+        <MRow>
+            <MCol Sm=4 Md=2>                
+                <MTextField TValue="string" @bind-Value="QueryName" Label="菜单名" Placeholder="请输入要查询的菜单名..." Outlined Clearable HideDetails="@("auto")"></MTextField>
+            </MCol>
+            <MCol Sm=4 Md=2>
+                <MTextField TValue="string" @bind-Value="QueryPriv" Label="权限" Placeholder="请输入要查询的权限名..." Outlined Clearable HideDetails="@("auto")"></MTextField>
+            </MCol>
+            <MCol Sm=4 Md=6>
+                <MButton class="white--text" XLarge Color="primary" OnClick="@(async ()=>{ await QueryList(); })">
+                    <MIcon Left Dark>
+                        mdi-magnify
+                    </MIcon>
+                    查询
+                </MButton>
+                <MButton XLarge OnClick="@(()=>{ ModiItem(new modelItem{}); })">
+                    新增
+                    <MIcon Right>
+                        mdi-playlist-plus
+                    </MIcon>
+                </MButton>
+            </MCol>
+
+        </MRow>
+    </MCardText>
+</MCard>
+
+<MCard Class="mt-4">
+    <MCardText Class="pa-6">
+        <MSimpleTable style="height: calc(100vh - 258px);overflow:auto;overflow-x:hidden;">
+            <thead>
+                <tr>
+                    <th style="width:40px"><MIcon Size=24 OnClick=@(()=>{ ExpandList(); }) title="@(_expand?"全部展开":"全部折叠")">@(_expand ? "mdi-expand-all" : "mdi-collapse-all")</MIcon></th>
+                    <th style="width:60px">图标</th>
+                    <th class="text-left" style="width:200px">菜单名</th>
+                    <th class="text-left" style="width:100px">权限</th>
+                    <th class="text-left">链接</th>
+                    <th class="text-left" style="width:120px">类型</th>
+                    <th class="text-left" style="width:400px">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var _module in moduleList.Where(_a => _a.Wml_pid == 0))
+                {
+                    <tr @key="_module.Wml_id">
+                        <td>
+                            @if(moduleList.Where(_c => _c.Wml_pid == _module.Wml_id).Any())
+                            {
+                                <MIcon Size=24 OnClick="()=>{ ExpandItem(_module);}">@(_module.Wml_active ? "mdi-menu-down" : "mdi-menu-right")</MIcon>
+                            }
+                            else
+                            {
+                                <MIcon Size=24>mdi-dots-horizontal</MIcon>
+                            }
+                        </td>
+                        <td><MIcon Size=20>@_module.Wml_icon</MIcon></td>
+                        <td>@_module.Wml_name</td>
+                        <td>@_module.Wml_purview</td>
+                        <td>@_module.Wml_url</td>
+                        <td>@(_module.Wml_target==0?"刷新":"新页面")</td>
+                        <td>
+                            <MButton XSmall Color="primary" OnClick="()=> ModiItem(_module)">编辑</MButton>
+                            <MButton XSmall OnClick="()=>CreateChild(_module)">新增子菜单</MButton>
+
+                            <MButton XSmall OnClick="()=>MoveUp(_module.Wml_id)">上移</MButton>
+                            <MButton XSmall OnClick="()=>MoveDown(_module.Wml_id)">下移</MButton>
+
+                            <MButton XSmall Color="error" OnClick="()=> AskDelectItem(_module) ">删除</MButton>
+                        </td>
+                    </tr>
+
+                    if (moduleList.Where(_c => _c.Wml_pid == _module.Wml_id).Any())
+                    {
+                        foreach (var _c_module in moduleList.Where(_c => _c.Wml_pid == _module.Wml_id).OrderBy(_c => _c.Wml_id).ToList())
+                        {
+                            <tr @key="_c_module.Wml_id" hidden="@(!_module.Wml_active)">
+                                <td></td>
+                                <td class="text-right"><MIcon Size=16>@_c_module.Wml_icon</MIcon></td>
+                                <td>@_c_module.Wml_name</td>
+                                <td>@_c_module.Wml_purview</td>
+                                <td>@_c_module.Wml_url</td>
+                                <td>@(_c_module.Wml_target == 0 ? "刷新" : "新页面")</td>
+                                <td>
+                                    <MButton XSmall Color="primary" OnClick="()=> ModiItem(_c_module)">编辑</MButton>
+
+                                    <MButton XSmall OnClick="()=>MoveUp(_c_module.Wml_id)">上移</MButton>
+                                    <MButton XSmall OnClick="()=>MoveDown(_c_module.Wml_id)">下移</MButton>
+
+                                    <MButton XSmall Color="error" OnClick="()=> AskDelectItem(_c_module)">删除</MButton>
+                                </td>
+                            </tr>
+                        }
+                    }
+                }
+            </tbody>
+        </MSimpleTable>
+    </MCardText>
+</MCard>
+
+<Edit @bind-Visible=_visible wId=@SeleteModel.Wml_id pId=@pId pName=@pName confirmFunc=@(()=>QueryList()) ></Edit>
+
+<MyDialog @bind-Visible=_dialogShow content="@($"要删除菜单【{SeleteModel.Wml_name}】吗？")" iconClass="mdi-account-question" cancelBtnVisable=true confirmFunc=@(()=>DelectItem(SeleteModel.Wml_id))></MyDialog>
+
+@code {
+    private IDataAccessInterface? Db;
+    class modelItem
+    {
+        /// <summary>
+        /// 编号
+        /// </summary>
+        public decimal Wml_id { get; set; }
+        /// <summary>
+        /// 菜单名
+        /// </summary>
+        public string Wml_name { get; set; }
+        /// <summary>
+        /// 图标
+        /// </summary>
+        public string Wml_icon { get; set; }
+        /// <summary>
+        /// 父编号
+        /// </summary>
+        public decimal? Wml_pid { get; set; } = 0M;
+        /// <summary>
+        /// 对应权限
+        /// </summary>
+        public string Wml_purview { get; set; }
+        /// <summary>
+        /// 0是刷新页面 1是打开新页面（Vue版全部为0）
+        /// </summary>
+        public decimal? Wml_target { get; set; } = 0M;
+        /// <summary>
+        /// Url地址
+        /// </summary>
+        public string Wml_url { get; set; }
+        /// <summary>
+        /// 选中
+        /// </summary>
+        public bool Wml_active { get; set; } = false;
+
+    }
+    private modelItem SeleteModel = new modelItem { };
+    private List<modelItem> moduleList = new List<modelItem> { };
+    private string QueryPriv = "";
+    private string QueryName = "";
+    private decimal pId;
+    private string pName;
+    private bool _dialogShow;
+    private bool _expand = true;
+    private List<decimal> _expandlist = new List<decimal> { };
+    private bool _visible;
+
+    protected override async void OnInitialized()
+    {
+        Db = ResolveNamed(nameof(DefaultDataAccess), default) as IDataAccessInterface;
+        QueryList();
+        base.OnInitialized();
+    }
+
+    private async Task QueryList()
+    {
+        moduleList = Db.BDA_GetSql().Module_GetModules(QueryName,QueryPriv).ConvertAll(_a => _a.Adapt<modelItem>());
+        if (!_expand) moduleList.ForEach(_a => { _a.Wml_active = true; });
+        else moduleList.Where(_a=> _expandlist.Contains(_a.Wml_id)).ToList().ForEach(_a => { _a.Wml_active = true; });
+    }
+
+    private async Task ExpandList()
+    {
+        moduleList.ForEach(_a => _a.Wml_active = _expand); 
+        _expand = !_expand;        
+    }
+
+    private async Task ExpandItem(modelItem _target)
+    {
+        _target.Wml_active = !_target.Wml_active;
+        _expandlist = moduleList.Where(_a => _a.Wml_active).Select(_a => _a.Wml_id).ToList();
+    }
+
+    private async Task ModiItem(modelItem _target)
+    {
+        pId = 0;
+        pName = "";
+        SeleteModel = _target;
+        _visible = true;
+    }
+
+    private async Task CreateChild(modelItem _target)
+    {
+        pId = _target.Wml_id;
+        pName = _target.Wml_name;
+        SeleteModel = new modelItem { };
+        _visible = true;
+    }
+
+    private async Task AskDelectItem(modelItem _target)
+    {
+        _dialogShow = true;
+        SeleteModel = _target;
+    }
+
+    private async Task DelectItem(decimal _id)
+    {
+        await Db.BDA_GetSql().Module_Delete(_id);
+        await QueryList();
+        _dialogShow = false;
+    }
+
+    private async Task MoveUp(decimal _id)
+    {
+        await Db.BDA_GetSql().Module_Move(_id,"up");
+        await QueryList();
+    }
+
+    private async Task MoveDown(decimal _id)
+    {
+        await Db.BDA_GetSql().Module_Move(_id,"dowm");
+        await QueryList();
+    }
+}
